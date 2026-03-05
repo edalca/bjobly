@@ -393,7 +393,8 @@ Grievance Against Party,Queja contra la parte
 Grievance Details,Detalles de la queja
 Grievance Type,Tipo de queja
 Gross Earnings,Ingresos brutos
-Gross Pay (Company Currency),Pago bruto (Moneda empresa)
+Gross Pay,Liquido a Recibir
+Gross Pay (Company Currency),Liquido a Recibir (Moneda empresa)
 Gross Year To Date,Bruto acumulado del año
 Gross Year To Date(Company Currency),Bruto acumulado (Moneda empresa)
 Group goal's progress is auto-calculated based on the child goals.,El progreso del grupo se calcula automáticamente por los hijos.
@@ -561,8 +562,9 @@ Month To Date(Company Currency),Acumulado del mes (Moneda empresa)
 Multiple Additional Salaries with overwrite property exist for Salary Component {0} between {1} and {2}.,Existen múltiples salarios adicionales con sobrescritura para {0} entre {1} y {2}.
 Multiple Shift Assignments,Asignaciones de turnos múltiples
 Name error,Error de nombre
-"Net Pay (Company Currency)","Pago Neto (Moneda de la Empresa)"
-Net Pay Info,Información de Pago Neto
+Net Pay,Total Sueldo
+"Net Pay (Company Currency)","Total Sueldo (Moneda de la Empresa)"
+Net Pay Info,Información de Total Sueldo
 New Feedback,Nueva Retroalimentación
 New Leave(s) Allocated,Nuevas Licencias Asignadas
 New shift assignments will be created after this date.,Se crearán nuevas asignaciones de turno después de esta fecha.
@@ -942,11 +944,11 @@ Total Deductions,Total de deducciones
 Total Earnings,Ingresos totales
 Total Expense Claim (via Expense Claims),Total de reclamos de gastos
 Total Goal Score,Puntuación total de objetivos
-Total Gross Pay,Pago bruto total
+Total Gross Pay,Total Liquido a Recibir
 Total Hours (T),Horas totales (T)
 Total Income Tax,Impuesto sobre la renta total
 Total Leaves ({0}),Total de licencias ({0})
-Total Net Pay,Pago neto total
+Total Net Pay,Total Sueldo
 Total Non-Billed Hours,Horas totales no facturadas
 Total Payable Amount,Monto total a pagar
 Total Payment,Pago total
