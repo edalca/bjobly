@@ -8,7 +8,7 @@ app_license = "mit"
 # Apps
 # ------------------
 
-# required_apps = []
+required_apps = ["hrms"]
 
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
@@ -43,8 +43,12 @@ app_license = "mit"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
-# doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
+doctype_js = {
+    "Payroll Entry": "public/js/payroll_entry.js"
+}
+doctype_list_js = {
+    "Payroll Entry" : "public/js/payroll_entry_list.js"
+}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 
@@ -83,11 +87,12 @@ app_license = "mit"
 # ------------
 
 # before_install = "bjobly.install.before_install"
-# after_install = "bjobly.install.after_install"
+after_install = "bjobly.install.after_install"
+# after_migrate = "bjobly.install.after_migrate"
 
 # Uninstallation
 # ------------
-
+    
 # before_uninstall = "bjobly.uninstall.before_uninstall"
 # after_uninstall = "bjobly.uninstall.after_uninstall"
 
@@ -129,9 +134,10 @@ app_license = "mit"
 # ---------------
 # Override standard doctype classes
 
-# override_doctype_class = {
-# 	"ToDo": "custom_app.overrides.CustomToDo"
-# }
+override_doctype_class = {
+	"Payroll Entry": "bjobly.overrides.payroll_entry.BjoblyPayrollEntry",
+    "Salary Slip": "bjobly.overrides.salary_slip.BjoblySalarySlip"
+}
 
 # Document Events
 # ---------------

@@ -1,0 +1,7 @@
+{
+    "python.defaultInterpreterPath": "/home/frappe/frappe-bench/env/bin/python",
+    "python.analysis.extraPaths": [
+        "/home/frappe/frappe-bench/apps",
+        "/home/frappe/frappe-bench/apps/frappe",
+    ]
+}
