@@ -217,6 +217,7 @@ Delete Attachment,Eliminar adjunto
 Department {0} does not belong to company: {1},El departamento {0} no pertenece a la empresa {1}
 Department: {0},Departamento: {0}
 Depends On Payment Days,Depende de los días de pago
+Department Wise Payroll Summary,Resumen de Nómina por Departamento
 Designation: {0},Designación: {0}
 "Disable {0} for the {1} component, to prevent the amount from being deducted twice, as its formula already uses a payment-days-based component.","Desactive {0} para el componente {1} para evitar que el monto se deduzca dos veces."
 Disable {0} or {1} to proceed.,Desactive {0} o {1} para proceder.
