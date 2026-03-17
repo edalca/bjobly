@@ -138,7 +138,8 @@ before_uninstall = "bjobly.uninstall.before_uninstall"
 
 override_doctype_class = {
 	"Payroll Entry": "bjobly.overrides.payroll_entry.BjoblyPayrollEntry",
-    "Salary Slip": "bjobly.overrides.salary_slip.BjoblySalarySlip"
+	"Salary Slip": "bjobly.overrides.salary_slip.BjoblySalarySlip",
+	"User": "bjobly.overrides.user.BjoblyUser",
 }
 
 # Document Events

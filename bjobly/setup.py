@@ -27,6 +27,7 @@ def after_install():
 
     flatten_hrms_desktop_icons()
     remove_rh_entries()
+    hide_non_hrms_desktop_icons()
 
     frappe.db.commit()
 
@@ -50,6 +51,7 @@ def before_uninstall():
     """
     # Restore "Frappe HR" folder grouping
     restore_hrms_desktop_icons()
+    restore_non_hrms_desktop_icons()
 
     # 1. Borrar campos
     delete_custom_fields(get_custom_fields())
@@ -66,6 +68,18 @@ def before_uninstall():
 
     frappe.db.commit()
 
+
+def hide_non_hrms_desktop_icons():
+    """Hides all desktop icons that don't belong to the hrms app."""
+    frappe.db.sql(
+        "UPDATE `tabDesktop Icon` SET hidden = 1 WHERE app != 'hrms' OR app IS NULL"
+    )
+
+def restore_non_hrms_desktop_icons():
+    """Restores visibility of non-hrms desktop icons."""
+    frappe.db.sql(
+        "UPDATE `tabDesktop Icon` SET hidden = 0 WHERE app != 'hrms' OR app IS NULL"
+    )
 
 def remove_rh_entries():
     """Deletes the custom 'RH' Desktop Icon and its Workspace Sidebar."""
