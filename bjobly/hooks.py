@@ -1,14 +1,14 @@
 app_name = "bjobly"
 app_title = "Bjobly"
-app_publisher = "Edwin Carrillo"
-app_description = "App"
+app_publisher = "edwinalonso162@hotmail.com"
+app_description = "Adaptacion Bjobly a Hrms"
 app_email = "edwinalonso162@hotmail.com"
 app_license = "mit"
 
 # Apps
 # ------------------
 
-# required_apps = []
+required_apps = ["hrms"]
 
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
@@ -43,8 +43,12 @@ app_license = "mit"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
-# doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
+doctype_js = {
+    "Payroll Entry": "public/js/payroll_entry.js"
+}
+doctype_list_js = {
+    "Payroll Entry" : "public/js/payroll_entry_list.js"
+}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 
@@ -86,12 +90,12 @@ app_license = "mit"
 # ------------
 
 # before_install = "bjobly.install.before_install"
-# after_install = "bjobly.install.after_install"
+after_install = "bjobly.install.after_install"
 
 # Uninstallation
 # ------------
 
-# before_uninstall = "bjobly.uninstall.before_uninstall"
+before_uninstall = "bjobly.uninstall.before_uninstall"
 # after_uninstall = "bjobly.uninstall.after_uninstall"
 
 # Integration Setup
@@ -127,6 +131,15 @@ app_license = "mit"
 # has_permission = {
 # 	"Event": "frappe.desk.doctype.event.event.has_permission",
 # }
+
+# DocType Class
+# ---------------
+# Override standard doctype classes
+
+override_doctype_class = {
+	"Payroll Entry": "bjobly.overrides.payroll_entry.BjoblyPayrollEntry",
+    "Salary Slip": "bjobly.overrides.salary_slip.BjoblySalarySlip"
+}
 
 # Document Events
 # ---------------
