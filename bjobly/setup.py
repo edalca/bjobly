@@ -28,6 +28,7 @@ def after_install():
     flatten_hrms_desktop_icons()
     remove_rh_entries()
     hide_non_hrms_desktop_icons()
+    add_payroll_sidebar_item()
 
     frappe.db.commit()
 
@@ -52,6 +53,7 @@ def before_uninstall():
     # Restore "Frappe HR" folder grouping
     restore_hrms_desktop_icons()
     restore_non_hrms_desktop_icons()
+    remove_payroll_sidebar_item()
 
     # 1. Borrar campos
     delete_custom_fields(get_custom_fields())
@@ -80,6 +82,57 @@ def restore_non_hrms_desktop_icons():
     frappe.db.sql(
         "UPDATE `tabDesktop Icon` SET hidden = 0 WHERE app != 'hrms' OR app IS NULL"
     )
+
+PAYROLL_SIDEBAR_ITEM_NAME = "bjobly-dept-payroll-rpt"
+PAYROLL_SIDEBAR_ITEM_AFTER = "Salary Register"  # insert after this label
+
+def add_payroll_sidebar_item():
+    """Adds the Payroll Summary report to the Payroll workspace sidebar."""
+    if frappe.db.exists("Workspace Sidebar Item", PAYROLL_SIDEBAR_ITEM_NAME):
+        return
+
+    # Find the idx of "Salary Register" in the Payroll sidebar
+    after_idx = frappe.db.get_value(
+        "Workspace Sidebar Item",
+        {"parent": "Payroll", "label": PAYROLL_SIDEBAR_ITEM_AFTER},
+        "idx"
+    ) or 9
+
+    # Shift all items after that idx up by 1
+    frappe.db.sql(
+        "UPDATE `tabWorkspace Sidebar Item` SET idx = idx + 1 WHERE parent = 'Payroll' AND idx > %s",
+        (after_idx,)
+    )
+
+    # Insert the new item
+    frappe.db.sql("""
+        INSERT INTO `tabWorkspace Sidebar Item`
+            (name, parent, parenttype, parentfield, idx, label, link_to, link_type,
+             type, child, collapsible, keep_closed, show_arrow, icon, indent,
+             creation, modified, modified_by, owner, docstatus)
+        VALUES
+            (%s, 'Payroll', 'Workspace Sidebar', 'items', %s,
+             'Payroll Summary', 'Payroll Summary', 'Report',
+             'Link', 1, 0, 0, 0, '', 0,
+             NOW(), NOW(), 'Administrator', 'Administrator', 0)
+    """, (PAYROLL_SIDEBAR_ITEM_NAME, after_idx + 1))
+
+
+def remove_payroll_sidebar_item():
+    """Removes the Payroll Summary entry from the Payroll workspace sidebar."""
+    if not frappe.db.exists("Workspace Sidebar Item", PAYROLL_SIDEBAR_ITEM_NAME):
+        return
+
+    idx = frappe.db.get_value("Workspace Sidebar Item", PAYROLL_SIDEBAR_ITEM_NAME, "idx") or 0
+    frappe.db.delete("Workspace Sidebar Item", {"name": PAYROLL_SIDEBAR_ITEM_NAME})
+
+    # Shift subsequent items back down
+    if idx:
+        frappe.db.sql(
+            "UPDATE `tabWorkspace Sidebar Item` SET idx = idx - 1 WHERE parent = 'Payroll' AND idx > %s",
+            (idx,)
+        )
+
 
 def remove_rh_entries():
     """Deletes the custom 'RH' Desktop Icon and its Workspace Sidebar."""
