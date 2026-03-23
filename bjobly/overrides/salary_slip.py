@@ -68,13 +68,18 @@ class BjoblySalarySlip(SalarySlip):
                 title=_("Invalid Date Range")
             )
 
-    def get_working_days_details(self, lwp=None, for_preview=0,lwp_days_corrected=None):
+    def get_working_days_details(self, lwp=None, for_preview=0, lwp_days_corrected=None):
         """
         OVERRIDE: Standardizes working days based on payroll frequency.
         Monthly = 30, Bimonthly = 60, Fortnightly = 15, Weekly = 7, Daily = 1.
-        Calendar days are ignored; calculations subtract absences from these fixed bases.
+
+        Rules:
+        - total_working_days is always the standard value (30 for monthly).
+        - For employees who worked the full period: payment_days = standard_days - (absences + lwp).
+        - For employees who joined or left mid-period: payment_days = actual_days_worked - (absences + lwp),
+          where actual_days_worked counts the relieving/joining date as a worked day.
+        - No decimals.
         """
-        # 1. Define standard days mapping
         frequency_days_map = {
             "Monthly": 30,
             "Bimonthly": 60,
@@ -82,25 +87,37 @@ class BjoblySalarySlip(SalarySlip):
             "Weekly": 7,
             "Daily": 1
         }
-        
-        # 2. Identify the target standard days for this slip
         standard_days = frequency_days_map.get(self.payroll_frequency, 30)
 
-        # 3. Execute standard ERPNext logic
-        # This will fetch real absent_days and leave_without_pay from Attendance/Leave records
-        super().get_working_days_details(lwp, for_preview,lwp_days_corrected)
+        # Run HRMS logic to populate absent_days and leave_without_pay
+        super().get_working_days_details(lwp, for_preview, lwp_days_corrected)
 
-        # 4. FORCE Standard Totals (The "Choluteca Rule")
-        # We overwrite self.total_working_days so that formulas using it as a divisor are correct.
+        start = getdate(self.start_date)
+        joining = getdate(self.joining_date) if self.joining_date else None
+        relieving = getdate(self.relieving_date) if self.relieving_date else None
+        end = getdate(self.end_date)
+
+        # Base days always starts at standard_days (30 for monthly)
+        base_days = standard_days
+
+        # Employee joined mid-period: subtract days before joining from the standard base
+        # e.g. joined day 16 → 30 - date_diff(day16, day1) = 30 - 15 = 15
+        if joining and joining > start:
+            base_days = standard_days - date_diff(joining, start)
+
+        # Employee left mid-period: count only days up to (but NOT including) the relieving date
+        # e.g. left day 15 → date_diff(day15, day1) = 14
+        if relieving and relieving < end:
+            if joining and joining > start:
+                base_days = date_diff(relieving, joining)
+            else:
+                base_days = date_diff(relieving, start)
+
+        # Force standard total
         self.total_working_days = standard_days
-        
-        # 5. Calculate Payment Days: Standard - (Absences + LWPs)
-        # Even if Feb has 28 days, if there is 1 absence, it calculates: 30 - 1 = 29.
-        total_absences = flt(self.absent_days) + flt(self.leave_without_pay)
-        self.payment_days = standard_days - total_absences
 
-        if self.payment_days < 0:
-            self.payment_days = 0
+        total_absences = flt(self.absent_days) + flt(self.leave_without_pay)
+        self.payment_days = cint(max(0, base_days - total_absences))
 
     def calculate_bonus(self, start_date, end_date, days, amount):
         """Custom logic for Bonus/Aguinaldo calculation based on worked days"""

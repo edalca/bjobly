@@ -49,7 +49,7 @@ frappe.ui.form.on("Payroll Entry", {
 
                 if (has_employees) {
                     // Always allow recalculating until slips are created (on submit)
-                    frm.add_custom_button(__("Calculate Salary Slips"), () => frm.trigger("run_calculation")).addClass("btn-secondary");
+                    frm.add_custom_button(__("Payroll Data Calculation"), () => frm.trigger("run_calculation")).addClass("btn-secondary");
                     if (frm.doc.salary_slips_calculated) {
                         frm.add_custom_button(__("Create Salary Slips"), () => frm.savesubmit()).addClass("btn-primary");
                     }
