@@ -226,6 +226,10 @@ class BjoblySalarySlip(SalarySlip):
 
     def compute_taxable_earnings_for_year(self):
         """Includes custom ISR deductions (taxable_deductions_till_date) in annual calculation"""
+        if not self.tax_slab:
+            # If no tax slab, skip annual calculation
+            return
+
         super().compute_taxable_earnings_for_year()
         
         # Subtract custom deductions from the total annual taxable base
@@ -235,6 +239,25 @@ class BjoblySalarySlip(SalarySlip):
         
         self.total_taxable_earnings -= flt(self.taxable_deductions_till_date)
         self.total_taxable_earnings_without_full_tax_addl_components -= flt(self.taxable_deductions_till_date)
+
+    def compute_variable_tax(self):
+        """
+        OVERRIDE: Guard against missing tax slab before HRMS tries to fetch it.
+        """
+        if not self._salary_structure_assignment.get("income_tax_slab"):
+            return
+        
+        super().compute_variable_tax()
+
+    def get_income_tax_slabs(self):
+        """
+        OVERRIDE: Return None if no tax slab is assigned, instead of throwing.
+        This allows payroll for employees who don't pay ISR.
+        """
+        if not self._salary_structure_assignment.income_tax_slab:
+            return None
+        
+        return super().get_income_tax_slabs()
 
     def get_amount_from_formula(self, struct_row, sub_period=1):
         """
@@ -268,6 +291,11 @@ class BjoblySalarySlip(SalarySlip):
         OVERRIDE: Copied from HRMS to ensure it calls the local version of
         calculate_tax_by_tax_slab and handles ISR proration based on payment days.
         """
+        if not self.tax_slab:
+            # Defensive guard: if no tax slab is assigned, skip variable tax calculation
+            self.current_tax_amount = 0
+            return
+
         self.previous_total_paid_taxes = self.get_tax_paid_in_period(
             self.payroll_period.start_date, self.start_date, tax_component
         )

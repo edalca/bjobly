@@ -35,6 +35,8 @@ def after_install():
 
     set_property_dynamic("Payroll Employee Detail", "absent_days", "read_only", 1, "Check")
     set_property_dynamic("Payroll Employee Detail", "leave_without_pay", "read_only", 1, "Check")
+    set_property_dynamic("Employee", "employment_type", "reqd", 1, "Check")
+    set_property_dynamic("Employee", "department", "reqd", 1, "Check")
 
     frappe.db.commit()
 
