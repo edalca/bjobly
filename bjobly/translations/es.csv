@@ -1104,4 +1104,31 @@ All Employment Types,Todos los Tipos de Empleo
 Date of Joining,Fecha de Ingreso
 Date of Birth,Fecha de Nacimiento
 Offer Date,Fecha de Oferta
-Payroll Data Calculation,Calculo de Datos de Nómina
+Payroll Data Calculation,Calcular Datos de Nómina
+Sort Employees,Ordenar Empleados
+Sort By,Ordenar Por
+"Last Name, First Name Middle Name","Apellidos, Nombre Segundo Nombre"
+"First Name Middle Name Last Name","Nombre Segundo Nombre Apellidos"
+"Last Name, First Name","Apellidos, Nombre"
+"First Name Last Name","Nombre Apellidos"
+"Last Name First Name Middle Name","Apellidos Nombre Segundo Nombre"
+"First Name Middle Initial. Last Name","Nombre Inicial Segundo Nombre Apellidos"
+Prorate Income Tax based on Payment Days,Prorratear ISR basado en días de pago
+"If checked, Income Tax (ISR) will be prorated based on payment days for partial months. Otherwise, it will be divided by the number of sub-periods (usually 12).","Si se marca, el ISR se prorrateará según los días de pago en meses parciales. De lo contrario, se dividirá entre el número de periodos (normalmente 12)."
+Other Settings,Otros Ajustes,
+"Base salary cannot be zero. Please enter a valid base salary.","El salario base no puede ser cero. Por favor ingrese un salario base válido.",
+Shift,Turno,
+Disable Rounded Total,Deshabilitar Total Redondeado,
+Create Salary Slips,Crear Recibos de Sueldo,
+Payroll Actions,Acciones de Nómina,
+"Days without records will be treated as attendance because validation is disabled.","Los días sin registro se tomarán como asistencia ya que la validación está desactivada.",
+Record Attendance,Registrar Asistencia,
+Attendance Dates,Fechas de Asistencia,
+Attendance Details,Detalles de Asistencia,
+Pending,Pendiente,
+Please select at least one date.,Por favor selecciona al menos una fecha.,
+"{0} attendance records created.","{0} registros de asistencia creados."
+Assign attendance records at calculating salary slips,Asignar los registros de asistencia al calcular recibos de sueldo
+Unmarked attendance status,Estado de asistencia no marcada
+Missing Configuration,Configuración Faltante
+"Please configure 'Assign attendance records at calculating salary slips' and 'Unmarked attendance status' in Payroll Settings because 'Validate Attendance' is disabled.","Por favor configure 'Asignar los registros de asistencia al calcular recibos de sueldo' y 'Estado de asistencia no marcada' en la Configuración de Nómina porque 'Validar Asistencia' está desactivado."

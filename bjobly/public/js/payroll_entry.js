@@ -7,7 +7,7 @@ frappe.provide("erpnext.accounts.dimensions");
 frappe.ui.form.on("Payroll Entry", {
     onload: function (frm) {
         frm.ignore_doctypes_on_cancel_all = ["Salary Slip", "Journal Entry"];
-        
+
         if (!frm.doc.posting_date) {
             frm.doc.posting_date = frappe.datetime.nowdate();
         }
@@ -30,7 +30,9 @@ frappe.ui.form.on("Payroll Entry", {
 
         // 2. Currency & Exchange Rate Logic
         frm.trigger('toggle_exchange_rate');
-
+        frm.trigger('show_attendance_warning');
+        const has_employees = !!(frm.doc.employees || []).length;
+        frm.toggle_display('calculate_salaries_btn', has_employees);
         // 3. Button Management
         // Clear any buttons added by HRMS's refresh handler (runs before this one)
         if (frm.doc.docstatus === 0 && !frm.is_new()) {
@@ -42,17 +44,13 @@ frappe.ui.form.on("Payroll Entry", {
                 frm.events._start_polling(frm);
             } else {
                 const has_employees = !!(frm.doc.employees || []).length;
+                frm.toggle_display('calculate_salaries_btn', has_employees);
 
-                // Always visible — allows refreshing the employee list
-                frm.add_custom_button(__("Get Employees"), () => frm.events.get_employee_details(frm))
-                    .toggleClass("btn-primary", !has_employees);
+                const actions_group = __("Actions");
+                frm.add_custom_button(__("Record Attendance"), () => frm.trigger("open_record_attendance_dialog"), actions_group);
 
-                if (has_employees) {
-                    // Always allow recalculating until slips are created (on submit)
-                    frm.add_custom_button(__("Payroll Data Calculation"), () => frm.trigger("run_calculation")).addClass("btn-secondary");
-                    if (frm.doc.salary_slips_calculated) {
-                        frm.add_custom_button(__("Create Salary Slips"), () => frm.savesubmit()).addClass("btn-primary");
-                    }
+                if (frm.doc.salary_slips_calculated) {
+                    frm.page.set_primary_action(__("Create Salary Slips"), () => frm.savesubmit());
                 }
             }
         }
@@ -89,7 +87,7 @@ frappe.ui.form.on("Payroll Entry", {
                 method: "create_journal_entry",
                 freeze: true,
                 freeze_message: __("Creating Journal Entry..."),
-                callback: function() {
+                callback: function () {
                     frm.reload_doc();
                     frappe.show_alert({ message: __("Journal Entry created"), indicator: "green" });
                 },
@@ -146,10 +144,10 @@ frappe.ui.form.on("Payroll Entry", {
     },
 
     // --- CURRENCY TRIGGERS ---
-    currency: function(frm) { frm.trigger('toggle_exchange_rate'); },
-    company: function(frm) { frm.trigger('toggle_exchange_rate'); },
+    currency: function (frm) { frm.trigger('toggle_exchange_rate'); },
+    company: function (frm) { frm.trigger('toggle_exchange_rate'); },
 
-    toggle_exchange_rate: function(frm) {
+    toggle_exchange_rate: function (frm) {
         if (frm.doc.currency && frm.doc.company) {
             frappe.call({
                 method: "frappe.client.get_value",
@@ -158,7 +156,7 @@ frappe.ui.form.on("Payroll Entry", {
                     filters: { name: frm.doc.company },
                     fieldname: "default_currency"
                 },
-                callback: function(r) {
+                callback: function (r) {
                     if (r.message && r.message.default_currency) {
                         const is_same = frm.doc.currency === r.message.default_currency;
                         frm.toggle_display('exchange_rate', !is_same);
@@ -172,21 +170,21 @@ frappe.ui.form.on("Payroll Entry", {
     },
 
     // --- CALCULATION LOGIC ---
-    run_calculation: function(frm) {
+    run_calculation: function (frm) {
         frappe.call({
             doc: frm.doc,
             method: "calculate_salary_slips", // Python method in your override
             freeze: true,
             freeze_message: __("Calculating payroll ..."),
-            callback: function() {
+            callback: function () {
                 frm.reload_doc();
-                frappe.show_alert({message: __("Salaries calculated successfully"), indicator: 'green'});
+                frappe.show_alert({ message: __("Salaries calculated successfully"), indicator: 'green' });
             }
         });
     },
 
     // --- HTML GRID RENDERING ---
-    render_all_html_tables: function(frm) {
+    render_all_html_tables: function (frm) {
         if (frm.doc.employees && frm.doc.employees.length) {
             frm.doc.employees.forEach((employee) => {
                 // Leemos la "memoria" que guardamos en el Python
@@ -196,12 +194,12 @@ frappe.ui.form.on("Payroll Entry", {
 
                     // Inyectamos el HTML usando set_df_property en la propiedad 'options'
                     // Argumentos: fieldname del child table, propiedad, valor, docname, fieldname del grid, name de la fila
-                    frm.set_df_property("employees", "options", 
-                        render_component_table(earnings, frm.doc.currency, "Earnings"), 
+                    frm.set_df_property("employees", "options",
+                        render_component_table(earnings, frm.doc.currency, "Earnings"),
                         frm.doc.name, "earnings_html", employee.name);
-                    
-                    frm.set_df_property("employees", "options", 
-                        render_component_table(deductions, frm.doc.currency, "Deductions"), 
+
+                    frm.set_df_property("employees", "options",
+                        render_component_table(deductions, frm.doc.currency, "Deductions"),
                         frm.doc.name, "deductions_html", employee.name);
                 } else {
                     // Si no hay datos, limpiamos los campos HTML
@@ -229,6 +227,219 @@ frappe.ui.form.on("Payroll Entry", {
         frm.set_query("payroll_payable_account", () => ({
             filters: { company: frm.doc.company, root_type: "Liability", is_group: 0 }
         }));
+    },
+
+    get_employees_btn: function (frm) {
+        frm.events.get_employee_details(frm);
+    },
+
+    calculate_salaries_btn: function (frm) {
+        frm.trigger("run_calculation");
+    },
+
+    validate_attendance: function (frm) {
+        frm.trigger("show_attendance_warning");
+    },
+
+    show_attendance_warning: function (frm) {
+        if (frm.doc.docstatus === 0 && !frm.doc.validate_attendance) {
+            frm.set_intro(__("Days without records will be treated as attendance because validation is disabled."), "orange");
+        } else {
+            frm.set_intro(null);
+        }
+    },
+
+    open_record_attendance_dialog: function (frm) {
+        let dialog = new frappe.ui.Dialog({
+            title: __("Record Attendance"),
+            fields: [
+                {
+                    fieldtype: "Section Break",
+                    hidden_border: 1
+                },
+                {
+                    label: __("From Date"),
+                    fieldname: "from_date",
+                    fieldtype: "Date",
+                    default: frm.doc.start_date,
+                    reqd: 1,
+                    onchange: () => dialog.trigger("update_grid")
+                },
+                {
+                    fieldtype: "Column Break"
+                },
+                {
+                    label: __("To Date"),
+                    fieldname: "to_date",
+                    fieldtype: "Date",
+                    default: frm.doc.end_date,
+                    reqd: 1,
+                    onchange: () => dialog.trigger("update_grid")
+                },
+                {
+                    fieldtype: "Section Break",
+                    hidden_border: 1
+                },
+                {
+                    label: __("Employee"),
+                    fieldname: "employee",
+                    fieldtype: "Link",
+                    options: "Employee",
+                    reqd: 1,
+                    onchange: () => dialog.trigger("update_grid")
+                },
+                {
+                    fieldtype: "Section Break",
+                    label: __("Attendance Details")
+                },
+                {
+                    label: __("Status"),
+                    fieldname: "status",
+                    fieldtype: "Select",
+                    options: "Present\nAbsent\nHalf Day\nWork From Home",
+                    default: "Present",
+                    reqd: 1
+                },
+                {
+                    label: __("Shift"),
+                    fieldname: "shift",
+                    fieldtype: "Link",
+                    options: "Shift Type"
+                },
+                {
+                    fieldtype: "Column Break"
+                },
+                {
+                    label: __("Late Entry"),
+                    fieldname: "late_entry",
+                    fieldtype: "Check"
+                },
+                {
+                    label: __("Early Exit"),
+                    fieldname: "early_exit",
+                    fieldtype: "Check"
+                },
+                {
+                    fieldtype: "Section Break",
+                    label: __("Attendance Dates")
+                },
+                {
+                    fieldname: "attendance_grid",
+                    fieldtype: "HTML"
+                }
+            ],
+            primary_action_label: __("Save"),
+            primary_action: (values) => {
+                let selected_dates = [];
+                dialog.$wrapper.find(".attendance-date-checkbox:checked").each(function () {
+                    selected_dates.push($(this).data("date"));
+                });
+
+                if (!selected_dates.length) {
+                    frappe.msgprint(__("Please select at least one date."));
+                    return;
+                }
+
+                frappe.call({
+                    method: "bulk_create_attendance",
+                    doc: frm.doc,
+                    args: {
+                        employee: values.employee,
+                        dates: selected_dates,
+                        status: values.status,
+                        shift: values.shift,
+                        late_entry: values.late_entry,
+                        early_exit: values.early_exit
+                    },
+                    freeze: true,
+                    callback: (r) => {
+                        if (r.message) {
+                            frappe.show_alert({
+                                message: __("{0} attendance records created.", [r.message]),
+                                indicator: "green"
+                            });
+                            dialog.hide();
+                            frm.reload_doc();
+                        }
+                    }
+                });
+            }
+        });
+
+        dialog.trigger = function (event) {
+            if (event === "update_grid") {
+                const employee = dialog.get_value("employee");
+                const from_date = dialog.get_value("from_date");
+                const to_date = dialog.get_value("to_date");
+
+                if (employee && from_date && to_date) {
+                    frappe.call({
+                        method: "get_attendance_for_range",
+                        doc: frm.doc,
+                        args: {
+                            employee: employee,
+                            from_date: from_date,
+                            to_date: to_date
+                        },
+                        callback: (r) => {
+                            render_attendance_grid(dialog, from_date, to_date, r.message || []);
+                        }
+                    });
+                }
+            }
+        };
+
+        const render_attendance_grid = (dialog, from_date, to_date, existing_records) => {
+            let start = moment(from_date);
+            let end = moment(to_date);
+            let existing_map = {};
+            existing_records.forEach(rec => {
+                existing_map[rec.attendance_date] = rec.status;
+            });
+
+            let html = `
+                <div style="max-height: 300px; overflow-y: auto; border: 1px solid #d1d8dd; border-radius: 4px;">
+                    <table class="table table-bordered table-condensed" style="margin-bottom: 0;">
+                        <thead>
+                            <tr style="background: #f8f9fa;">
+                                <th style="width: 40px;" class="text-center"><input type="checkbox" id="select-all-attendance"></th>
+                                <th>${__("Date")}</th>
+                                <th>${__("Status")}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            let current = start.clone();
+            while (current <= end) {
+                let date_str = current.format("YYYY-MM-DD");
+                let status = existing_map[date_str] || "";
+                let is_checked = status ? "" : "checked";
+                let disabled = status ? "disabled" : "";
+
+                html += `
+                    <tr>
+                        <td class="text-center">
+                            <input type="checkbox" class="attendance-date-checkbox" 
+                                data-date="${date_str}" ${is_checked} ${disabled}>
+                        </td>
+                        <td>${frappe.datetime.str_to_user(date_str)}</td>
+                        <td><span class="label ${status ? 'label-info' : ''}">${__(status) || __("Pending")}</span></td>
+                    </tr>
+                `;
+                current.add(1, "days");
+            }
+
+            html += `</tbody></table></div>`;
+            dialog.get_field("attendance_grid").$wrapper.html(html);
+
+            dialog.$wrapper.find("#select-all-attendance").on("change", function () {
+                dialog.$wrapper.find(".attendance-date-checkbox:not(:disabled)").prop("checked", $(this).prop("checked"));
+            });
+        };
+
+        dialog.show();
+        dialog.trigger("update_grid");
     }
 });
 
@@ -249,7 +460,7 @@ const render_component_table = function (components, currency, title = "") {
                 </thead>
                 <tbody>
     `;
-    
+
     let total = 0;
     components.forEach(comp => {
         total += flt(comp.amount);

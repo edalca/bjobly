@@ -25,10 +25,16 @@ def after_install():
     set_property_dynamic("Bulk Salary Structure Assignment", "payroll_payable_account", "hidden", 1, "Check")
     set_property_dynamic("Salary Structure Assignment", "payroll_payable_account", "hidden", 1, "Check")
 
+    set_property_dynamic("Employee", "employee_name", "hidden", 1, "Check")
+    set_property_dynamic("Employee", "salutation", "hidden", 1, "Check")
+
     flatten_hrms_desktop_icons()
     remove_rh_entries()
     hide_non_hrms_desktop_icons()
     add_payroll_sidebar_item()
+
+    set_property_dynamic("Payroll Employee Detail", "absent_days", "read_only", 1, "Check")
+    set_property_dynamic("Payroll Employee Detail", "leave_without_pay", "read_only", 1, "Check")
 
     frappe.db.commit()
 
@@ -133,7 +139,6 @@ def remove_payroll_sidebar_item():
             (idx,)
         )
 
-
 def remove_rh_entries():
     """Deletes the custom 'RH' Desktop Icon and its Workspace Sidebar."""
     frappe.db.delete("Workspace Sidebar Item", {"parent": "RH"})
@@ -165,10 +170,19 @@ def get_custom_fields():
     preserving the integrity of the original DocType structure.
     """
     return {
+        "Employee": [
+            {"fieldname": "dpi", "label": _("DPI"), "fieldtype": "Data", "insert_after": "column_break_9"},
+            {"fieldname": "nit", "label": _("NIT"), "fieldtype": "Data", "insert_after": "dpi"},
+        ],
         "Payroll Entry": [
             {"fieldname": "description", "label": _("Description"), "fieldtype": "Data", "insert_after": "posting_date", "reqd": 1},
             {"fieldname": "employment_type", "label": _("Employment Type"), "fieldtype": "Link", "options": "Employment Type", "insert_after": "branch"},
-            {"fieldname": "column_break_mfhl", "fieldtype": "Column Break", "insert_after": "grade"},
+            {"fieldname": "section_break_ops", "fieldtype": "Section Break", "insert_after": "number_of_employees"},
+            {"fieldname": "column_break_sort", "label": _("Sort Employees"), "fieldtype": "Column Break", "insert_after": "section_break_ops"},
+            {"fieldname": "sort_employees_by", "label": _("Sort By"), "fieldtype": "Select", "options": "Last Name, First Name Middle Name\nFirst Name Middle Name Last Name\nLast Name, First Name\nFirst Name Last Name\nLast Name First Name Middle Name\nFirst Name Middle Initial. Last Name", "default": "First Name Last Name", "insert_after": "column_break_sort"},
+            {"fieldname": "column_break_actions", "label": _("Payroll Actions"), "fieldtype": "Column Break", "insert_after": "sort_employees_by"},
+            {"fieldname": "get_employees_btn", "label": _("Get Employees"), "fieldtype": "Button", "insert_after": "column_break_actions"},
+            {"fieldname": "calculate_salaries_btn", "label": _("Payroll Data Calculation"), "fieldtype": "Button", "insert_after": "get_employees_btn"},
             {"fieldname": "totals_section", "label": _("Totals"), "fieldtype": "Section Break", "insert_after": "employees"},
             {"fieldname": "gross_pay", "label": _("Gross Pay"), "fieldtype": "Currency", "read_only": 1, "insert_after": "totals_section","in_list_view": 1},
             {"fieldname": "column_break_hwip", "fieldtype": "Column Break", "insert_after": "gross_pay"},
@@ -234,6 +248,7 @@ def get_custom_fields():
         "Salary Slip": [
             # --- SECCIÓN ESTADÍSTICA (Nueva) ---
             {"fieldname": "section_break_pmbt", "fieldtype": "Section Break", "insert_after": "deductions"},
+            {"fieldname": "unmarked_days", "label": _("Unmarked Days"), "fieldtype": "Float", "read_only": 1, "insert_after": "section_break_pmbt"},
             {"fieldname": "earnings_statistical", "label": _("Statistical Earnings"), "fieldtype": "Table", "options": "Salary Detail", "read_only": 1, "insert_after": "section_break_pmbt"},
             {"fieldname": "column_break_kfvn", "fieldtype": "Column Break", "insert_after": "earnings_statistical"},
             {"fieldname": "deductions_stadistical", "label": _("Statistical Deductions"), "fieldtype": "Table", "options": "Salary Detail", "read_only": 1, "insert_after": "column_break_kfvn"},
@@ -250,6 +265,29 @@ def get_custom_fields():
             {"fieldname": "section_break_ppum", "fieldtype": "Section Break", "insert_after": "deduct_tax_for_unsubmitted_tax_exemption_proof"},
             {"fieldname": "section_break_fusm", "fieldtype": "Section Break", "insert_after": "year_to_date"},
             {"fieldname": "section_break_vgrs", "fieldtype": "Section Break", "insert_after": "base_year_to_date"},
+        ],
+        "Payroll Settings": [
+            {
+                "fieldname": "prorate_isr_based_on_payment_days",
+                "label": _("Prorate Income Tax based on Payment Days"),
+                "fieldtype": "Check",
+                "insert_after": "create_overtime_slip",
+                "description": _("If checked, Income Tax (ISR) will be prorated based on payment days for partial months. Otherwise, it will be divided by the number of sub-periods (usually 12).")
+            },
+            {
+                "fieldname": "assign_attendance_at_calculating_salary_slips",
+                "label": _("Assign attendance records at calculating salary slips"),
+                "fieldtype": "Check",
+                "insert_after": "consider_marked_attendance_on_holidays"
+            },
+            {
+                "fieldname": "unmarked_attendance_status",
+                "label": _("Unmarked attendance status"),
+                "fieldtype": "Select",
+                "options": "Present\nAbsent",
+                "depends_on": "eval:doc.assign_attendance_at_calculating_salary_slips",
+                "insert_after": "assign_attendance_at_calculating_salary_slips"
+            }
         ]
     }
 
@@ -314,4 +352,13 @@ def set_property_dynamic(doctype, fieldname, property, value, property_type,doct
             "property_type": property_type,
             "doctype_or_field": doctype_or_field
         }, ignore_validate=True)
+
+
+def sync_custom_fields():
+    """
+    Surgically syncs custom fields defined in this module.
+    """
+    from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+    create_custom_fields(get_custom_fields(), ignore_validate=True)
+    frappe.db.commit()
         

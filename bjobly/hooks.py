@@ -137,6 +137,7 @@ before_uninstall = "bjobly.uninstall.before_uninstall"
 # Override standard doctype classes
 
 override_doctype_class = {
+	"Salary Structure Assignment": "bjobly.overrides.salary_structure_assignment.BjoblySalaryStructureAssignment",
 	"Payroll Entry": "bjobly.overrides.payroll_entry.BjoblyPayrollEntry",
 	"Salary Slip": "bjobly.overrides.salary_slip.BjoblySalarySlip",
 	"User": "bjobly.overrides.user.BjoblyUser",

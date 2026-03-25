@@ -39,6 +39,17 @@ bjobly/
 | Filtro empleados | Filtra por `payroll_payable_account` | Sin ese filtro |
 | Cálculo de impuesto | Estándar | Progresivo por tramos |
 
+## Cálculo de impuesto (ISR) - Detalles de Implementación
+
+El cálculo de ISR en **bjobly** sobrescribe la lógica estándar de HRMS para soportar tramos progresivos específicos de Guatemala.
+
+### Mejoras Recientes (Marzo 2026)
+
+1.  **Corrección de Lógica por Tramos**: Se corrigió un error donde `amount_previusly_taxed` no se actualizaba correctamente, lo que causaba que niveles superiores de ingreso no restaran la base ya tributada en tramos inferiores (previniendo doble tributación).
+2.  **Solución de Alcance (Scoping)**: Se sobrescribió completamente `calculate_variable_tax` en `BjoblySalarySlip`. Esto asegura que las llamadas internas de HRMS utilicen la función `calculate_tax_by_tax_slab` definida localmente en el override, en lugar de la versión original del módulo hrms.
+3.  **Bug de Condiciones Vacías**: Se reemplazó `str(slab.condition)` por `cstr(slab.condition)`. En Frappe, una condición vacía es `None`; usar `str()` la convertía en el string `"None"`, lo que provocaba que el sistema intentara evaluarla, fallara y saltara el tramo de impuesto (dejando el ISR en 0 para todos).
+4.  **Soporte de Tax Relief**: Se integró la validación de `tax_relief_limit` para respetar el mínimo exento definido en el DocType *Income Tax Slab*.
+
 ## Mecanismo de override
 
 - **Clases**: `override_doctype_class` en `hooks.py`
@@ -55,6 +66,13 @@ En `BjoblySalarySlip.get_working_days_details()`:
 - Diario → 1 día
 
 `payment_days = días_fijos - (ausencias + licencias_sin_pago)`
+
+## Comandos Útiles (Docker)
+
+Para ejecutar pruebas de lógica dentro del contenedor:
+```bash
+docker exec bjobly-v16-web-1 bench --site bjobly.localhost execute "from bjobly.overrides.salary_slip import calculate_tax_by_tax_slab; print(calculate_tax_by_tax_slab(500000, frappe.get_doc('Income Tax Slab', 'I.S.R. 2026'), {}, {}))"
+```
 
 ## Gitignore
 

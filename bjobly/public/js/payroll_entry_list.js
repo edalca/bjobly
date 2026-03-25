@@ -8,8 +8,10 @@ frappe.listview_settings['Payroll Entry'] = {
             return [__("Draft"), "red", "status,=,Draft"];
         } else if (doc.status === "Submitted") {
             return [__("Submitted"), "blue", "status,=,Submitted"];
+        } else if (doc.status === "Cancelled") {
+            return [__("Cancelled"), "darkgrey", "status,=,Cancelled"];
         } else {
-            return [__(doc.status), "green", "status,=," + doc.status];
+            return [__(doc.status), "green", "status,=," + doc.status]; // Paid, etc.
         }
     },
 
