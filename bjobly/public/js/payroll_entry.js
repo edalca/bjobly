@@ -30,7 +30,6 @@ frappe.ui.form.on("Payroll Entry", {
 
         // 2. Currency & Exchange Rate Logic
         frm.trigger('toggle_exchange_rate');
-        frm.trigger('show_attendance_warning');
         const has_employees = !!(frm.doc.employees || []).length;
         frm.toggle_display('calculate_salaries_btn', has_employees);
         // 3. Button Management
@@ -47,6 +46,7 @@ frappe.ui.form.on("Payroll Entry", {
                 frm.toggle_display('calculate_salaries_btn', has_employees);
 
                 const actions_group = __("Actions");
+                frm.add_custom_button(__("Get Employees"), () => frm.events.get_employee_details(frm), actions_group);
                 frm.add_custom_button(__("Record Attendance"), () => frm.trigger("open_record_attendance_dialog"), actions_group);
 
                 if (frm.doc.salary_slips_calculated) {
@@ -179,6 +179,14 @@ frappe.ui.form.on("Payroll Entry", {
             callback: function () {
                 frm.reload_doc();
                 frappe.show_alert({ message: __("Salaries calculated successfully"), indicator: 'green' });
+
+                if (!frm.doc.validate_attendance && !frm._attendance_warning_shown) {
+                    frappe.show_alert({
+                        message: __("Days without records will be treated as attendance because validation is disabled."),
+                        indicator: "orange"
+                    }, 7);
+                    frm._attendance_warning_shown = true;
+                }
             }
         });
     },
@@ -234,18 +242,12 @@ frappe.ui.form.on("Payroll Entry", {
     },
 
     calculate_salaries_btn: function (frm) {
-        frm.trigger("run_calculation");
-    },
-
-    validate_attendance: function (frm) {
-        frm.trigger("show_attendance_warning");
-    },
-
-    show_attendance_warning: function (frm) {
-        if (frm.doc.docstatus === 0 && !frm.doc.validate_attendance) {
-            frm.set_intro(__("Days without records will be treated as attendance because validation is disabled."), "orange");
+        if (frm.is_dirty()) {
+            frm.save().then(() => {
+                frm.trigger("run_calculation");
+            });
         } else {
-            frm.set_intro(null);
+            frm.trigger("run_calculation");
         }
     },
 

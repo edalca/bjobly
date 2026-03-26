@@ -65,7 +65,7 @@ def execute(filters=None):
 
         ex_rate = flt(ss.exchange_rate) if flt(ss.exchange_rate) > 0 else 1.0
         igss_laboral = flt(igss_by_slip.get(ss.name, 0)) * ex_rate
-        igss_patronal = flt(nominal_by_slip.get(ss.name, 0)) * ex_rate * EMPLOYER_IGSS_RATE
+        igss_patronal = flt(nominal_by_slip.get(ss.name, 0)) * ex_rate * EMPLOYER_IGSS_RATE if igss_laboral > 0 else 0
         net = flt(ss.net_pay) * ex_rate
 
         if all_et:

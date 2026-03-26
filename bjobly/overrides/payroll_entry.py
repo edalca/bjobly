@@ -324,8 +324,8 @@ class BjoblyPayrollEntry(PayrollEntry):
 
             frappe.throw(error_msg, title=_("No employees found"))
 
-        # Ordenar empleados según el campo sort_employees_by
-        sort_by = getattr(self, "sort_employees_by", None)
+        # Ordenar empleados según el campo sort_employees_by (Predeterminado: Last Name, First Name Middle Name)
+        sort_by = getattr(self, "sort_employees_by", None) or "Last Name, First Name Middle Name"
         LASTNAME_FIRST = {
             "Last Name, First Name Middle Name",
             "Last Name, First Name",

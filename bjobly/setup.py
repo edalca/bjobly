@@ -181,7 +181,7 @@ def get_custom_fields():
             {"fieldname": "employment_type", "label": _("Employment Type"), "fieldtype": "Link", "options": "Employment Type", "insert_after": "branch"},
             {"fieldname": "section_break_ops", "fieldtype": "Section Break", "insert_after": "number_of_employees"},
             {"fieldname": "column_break_sort", "label": _("Sort Employees"), "fieldtype": "Column Break", "insert_after": "section_break_ops"},
-            {"fieldname": "sort_employees_by", "label": _("Sort By"), "fieldtype": "Select", "options": "Last Name, First Name Middle Name\nFirst Name Middle Name Last Name\nLast Name, First Name\nFirst Name Last Name\nLast Name First Name Middle Name\nFirst Name Middle Initial. Last Name", "default": "First Name Last Name", "insert_after": "column_break_sort"},
+            {"fieldname": "sort_employees_by", "label": _("Sort By"), "fieldtype": "Select", "options": "Last Name, First Name Middle Name\nFirst Name Middle Name Last Name\nLast Name, First Name\nFirst Name Last Name\nLast Name First Name Middle Name\nFirst Name Middle Initial. Last Name", "default": "Last Name, First Name Middle Name", "insert_after": "column_break_sort"},
             {"fieldname": "column_break_actions", "label": _("Payroll Actions"), "fieldtype": "Column Break", "insert_after": "sort_employees_by"},
             {"fieldname": "get_employees_btn", "label": _("Get Employees"), "fieldtype": "Button", "insert_after": "column_break_actions"},
             {"fieldname": "calculate_salaries_btn", "label": _("Payroll Data Calculation"), "fieldtype": "Button", "insert_after": "get_employees_btn"},
@@ -362,5 +362,9 @@ def sync_custom_fields():
     """
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
     create_custom_fields(get_custom_fields(), ignore_validate=True)
+    
+    # 1. Establecer el ordenamiento predeterminado: Last Name, First Name Middle Name
+    set_property_dynamic("Payroll Entry", "sort_employees_by", "default", "Last Name, First Name Middle Name", "Data")
+    
     frappe.db.commit()
         

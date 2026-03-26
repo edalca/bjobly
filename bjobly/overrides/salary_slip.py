@@ -65,10 +65,13 @@ class BjoblySalarySlip(SalarySlip):
         return res
 
     def validate(self):
-        # 1. Validar que el rango de fechas coincida con la frecuencia
+        # 1. Initialize tax_slab to prevent AttributeErrors if calculation is skipped
+        self.tax_slab = getattr(self, "tax_slab", None)
+
+        # 2. Validar que el rango de fechas coincida con la frecuencia
         self.validate_payroll_range()
         
-        # 2. Ejecutar las validaciones estándar de ERPNext
+        # 3. Ejecutar las validaciones estándar de ERPNext
         super().validate()
 
     def validate_payroll_range(self):
@@ -226,7 +229,7 @@ class BjoblySalarySlip(SalarySlip):
 
     def compute_taxable_earnings_for_year(self):
         """Includes custom ISR deductions (taxable_deductions_till_date) in annual calculation"""
-        if not self.tax_slab:
+        if not getattr(self, "tax_slab", None):
             # If no tax slab, skip annual calculation
             return
 
@@ -240,13 +243,41 @@ class BjoblySalarySlip(SalarySlip):
         self.total_taxable_earnings -= flt(self.taxable_deductions_till_date)
         self.total_taxable_earnings_without_full_tax_addl_components -= flt(self.taxable_deductions_till_date)
 
-    def compute_variable_tax(self):
+    def add_tax_components(self):
         """
         OVERRIDE: Guard against missing tax slab before HRMS tries to fetch it.
+        Also silences the 'Added tax components...' message.
         """
-        if not self._salary_structure_assignment.get("income_tax_slab"):
+        if not getattr(self, "_salary_structure_assignment", None) or not self._salary_structure_assignment.get("income_tax_slab"):
             return
-        
+
+        # --- Logic copied from HRMS add_tax_components but MINUS the msgprint ---
+        tax_components, self.other_deduction_components = [], []
+        for d in self._salary_structure_doc.get("deductions"):
+            if d.variable_based_on_taxable_salary == 1 and not d.formula and not flt(d.amount):
+                tax_components.append(d.salary_component)
+            else:
+                self.other_deduction_components.append(d.salary_component)
+
+        if not tax_components:
+            tax_components = [
+                d.salary_component for d in self.get("deductions") if d.variable_based_on_taxable_salary
+            ]
+
+        # SILENCED: if self.is_new() and not tax_components: ... msgprint ... 
+        if self.is_new() and not tax_components:
+            tax_components = self.get_tax_components()
+
+        self._component_based_variable_tax = {}
+        if tax_components and self.payroll_period and self.salary_structure:
+            self.tax_slab = self.get_income_tax_slabs()
+            self.compute_taxable_earnings_for_year()
+
+        if self.handle_additional_salary_tax_component():
+            self._component_based_variable_tax.setdefault(self.additional_salary_component, {})
+            self.calculate_variable_tax(self.additional_salary_component, True)
+            return
+
         super().compute_variable_tax()
 
     def get_income_tax_slabs(self):
@@ -291,7 +322,7 @@ class BjoblySalarySlip(SalarySlip):
         OVERRIDE: Copied from HRMS to ensure it calls the local version of
         calculate_tax_by_tax_slab and handles ISR proration based on payment days.
         """
-        if not self.tax_slab:
+        if not getattr(self, "tax_slab", None):
             # Defensive guard: if no tax slab is assigned, skip variable tax calculation
             self.current_tax_amount = 0
             return
@@ -360,6 +391,10 @@ class BjoblySalarySlip(SalarySlip):
         """
         OVERRIDE: Populates custom Bjobly fields for the ISR breakdown UI.
         """
+        if not getattr(self, "tax_slab", None):
+            # Defensive guard: skip breakup computation if no tax slab is assigned
+            return
+
         super().compute_income_tax_breakup()
         
         # Populate fields used in the Guatemala/Bjobly print formats and UI breakdown
