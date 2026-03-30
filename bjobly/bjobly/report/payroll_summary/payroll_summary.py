@@ -3,10 +3,8 @@
 
 import frappe
 from frappe import _
-from frappe.utils import flt, cint
+from frappe.utils import flt
 import erpnext
-
-EMPLOYER_IGSS_RATE = 0.1267  # 12.67%
 
 GROUP_BY_MAP = {
     "Department": "department",
@@ -22,173 +20,179 @@ def execute(filters=None):
     company_currency = erpnext.get_company_currency(filters.get("company"))
     group_by_label = filters.get("group_by") or "Department"
     group_by_field = GROUP_BY_MAP.get(group_by_label, "department")
-    employment_type = filters.get("employment_type")
-    all_et = cint(filters.get("all_employment_types", 1))
 
-    salary_slips = get_salary_slips(filters, group_by_field, include_employment_type=all_et)
+    salary_slips = get_salary_slips(filters, group_by_field)
     if not salary_slips:
         return [], []
 
-    # When showing all employment types, collect distinct ones from the data
-    employment_types = []
-    if all_et:
-        seen = []
-        for ss in salary_slips:
-            et = ss.get("employment_type") or _("No Type")
-            if et not in seen:
-                seen.append(et)
-        employment_types = sorted(seen)
+    # Collect ordered distinct payroll types from the data
+    seen_types = []
+    for ss in salary_slips:
+        pt = ss.get("custom_payroll_type") or _("No Type")
+        if pt not in seen_types:
+            seen_types.append(pt)
+    seen_types = sorted(seen_types)
 
-    columns = get_columns(company_currency, group_by_label, employment_type, employment_types)
+    columns = get_columns(company_currency, group_by_label, seen_types)
 
     slip_names = [ss.name for ss in salary_slips]
-    igss_by_slip = get_component_amounts_by_slip(slip_names, "I.G.S.S.")
-    nominal_by_slip = get_component_amounts_by_slip(slip_names, "Nominal")
+
+    # Fuente A: Salary Detail rows where the component has custom_is_employer_contribution = 1
+    employer_from_detail = get_employer_amounts_from_detail(slip_names)
+    # Fuente B: employer_contributions child table (Salary Detail parentfield)
+    employer_from_table = get_employer_amounts_from_table(slip_names)
 
     summary = {}
+    employees_by_group = {}
+
     for ss in salary_slips:
         group_val = ss.get(group_by_field) or _("No {0}").format(group_by_label)
 
         if group_val not in summary:
             row = {
                 "group_by": group_val,
+                "employee_count": 0,
                 "total_igss_payment": 0.0,
                 "gran_total": 0.0,
                 "currency": company_currency,
             }
-            if all_et:
-                for et in employment_types:
-                    row[_et_fieldname(et)] = 0.0
-            else:
-                row["net_pay"] = 0.0
+            for pt in seen_types:
+                row[_pt_fieldname(pt)] = 0.0
             summary[group_val] = row
+            employees_by_group[group_val] = set()
+
+        employees_by_group[group_val].add(ss.get("employee"))
 
         ex_rate = flt(ss.exchange_rate) if flt(ss.exchange_rate) > 0 else 1.0
-        igss_laboral = flt(igss_by_slip.get(ss.name, 0)) * ex_rate
-        igss_patronal = flt(nominal_by_slip.get(ss.name, 0)) * ex_rate * EMPLOYER_IGSS_RATE if igss_laboral > 0 else 0
         net = flt(ss.net_pay) * ex_rate
 
-        if all_et:
-            et = ss.get("employment_type") or _("No Type")
-            summary[group_val][_et_fieldname(et)] += net
-        else:
-            summary[group_val]["net_pay"] += net
+        # Consolidate employer contribution from both sources
+        employer_total = (
+            flt(employer_from_detail.get(ss.name, 0)) +
+            flt(employer_from_table.get(ss.name, 0))
+        ) * ex_rate
 
-        summary[group_val]["total_igss_payment"] += igss_laboral + igss_patronal
-        summary[group_val]["gran_total"] += net + igss_laboral + igss_patronal
+        pt = ss.get("custom_payroll_type") or _("No Type")
+        summary[group_val][_pt_fieldname(pt)] += net
+        summary[group_val]["total_igss_payment"] += employer_total
+        summary[group_val]["gran_total"] += net + employer_total
+
+    for group_val, row in summary.items():
+        row["employee_count"] = len(employees_by_group[group_val])
 
     data = [summary[k] for k in sorted(summary.keys())]
 
-    # Grand total row
+    all_employees = set()
+    for s in employees_by_group.values():
+        all_employees |= s
+
     grand_row = {
         "group_by": _("Gran Total"),
+        "employee_count": len(all_employees),
         "total_igss_payment": sum(r["total_igss_payment"] for r in data),
         "gran_total": sum(r["gran_total"] for r in data),
         "currency": company_currency,
         "bold": 1,
     }
-    if all_et:
-        for et in employment_types:
-            fn = _et_fieldname(et)
-            grand_row[fn] = sum(r.get(fn, 0) for r in data)
-    else:
-        grand_row["net_pay"] = sum(r["net_pay"] for r in data)
+    for pt in seen_types:
+        fn = _pt_fieldname(pt)
+        grand_row[fn] = sum(r.get(fn, 0) for r in data)
 
     data.append(grand_row)
     return columns, data
 
 
-def _et_fieldname(employment_type):
-    """Converts an employment type name to a safe fieldname."""
-    return "net_pay_" + frappe.scrub(employment_type)
+def _pt_fieldname(payroll_type):
+    return "net_pay_" + frappe.scrub(payroll_type)
 
 
-def get_columns(currency, group_by_label, employment_type=None, employment_types=None):
+def get_columns(currency, group_by_label, payroll_types):
     cols = [
-        {
-            "label": _(group_by_label),
-            "fieldname": "group_by",
-            "fieldtype": "Data",
-            "width": 200,
-        }
+        {"label": _(group_by_label), "fieldname": "group_by",       "fieldtype": "Data",     "width": 200},
+        {"label": _("Employees"),    "fieldname": "employee_count",  "fieldtype": "Int",      "width": 100},
     ]
 
-    if employment_types:
-        # One Net Pay column per employment type
-        for et in employment_types:
-            cols.append({
-                "label": _("{0}").format(et),
-                "fieldname": _et_fieldname(et),
-                "fieldtype": "Currency",
-                "options": "currency",
-                "width": 160,
-            })
-    else:
-        net_pay_label = _("{0}").format(employment_type) if employment_type else _("Net Pay")
+    for pt in payroll_types:
         cols.append({
-            "label": net_pay_label,
-            "fieldname": "net_pay",
+            "label": _(pt),
+            "fieldname": _pt_fieldname(pt),
             "fieldtype": "Currency",
             "options": "currency",
-            "width": 150,
+            "width": 180,
         })
 
     cols += [
-        {
-            "label": _("Total IGSS Payment"),
-            "fieldname": "total_igss_payment",
-            "fieldtype": "Currency",
-            "options": "currency",
-            "width": 180,
-        },
-        {
-            "label": _("Gran Total"),
-            "fieldname": "gran_total",
-            "fieldtype": "Currency",
-            "options": "currency",
-            "width": 180,
-        },
-        {
-            "label": _("Currency"),
-            "fieldname": "currency",
-            "fieldtype": "Data",
-            "hidden": 1,
-        },
+        {"label": _("Total IGSS Payment"), "fieldname": "total_igss_payment", "fieldtype": "Currency", "options": "currency", "width": 180},
+        {"label": _("Gran Total"),         "fieldname": "gran_total",          "fieldtype": "Currency", "options": "currency", "width": 180},
+        {"label": _("Currency"),           "fieldname": "currency",            "fieldtype": "Data",     "hidden": 1},
     ]
     return cols
 
 
-def get_component_amounts_by_slip(slip_names, component_name):
+def get_employer_amounts_from_detail(slip_names):
+    """
+    Fuente A: SUM of Salary Detail amounts where the Salary Component
+    has custom_is_employer_contribution = 1 (earnings/deductions parentfields).
+    """
     if not slip_names:
         return {}
+
     sd = frappe.qb.DocType("Salary Detail")
+    sc = frappe.qb.DocType("Salary Component")
+
+    rows = (
+        frappe.qb.from_(sd)
+        .join(sc).on(sd.salary_component == sc.name)
+        .select(sd.parent, sd.amount)
+        .where(sd.parent.isin(slip_names))
+        .where(sd.parentfield.isin(["earnings", "deductions"]))
+        .where(sc.custom_is_employer_contribution == 1)
+    ).run(as_dict=1)
+
+    result = {}
+    for r in rows:
+        result[r.parent] = result.get(r.parent, 0) + flt(r.amount)
+    return result
+
+
+def get_employer_amounts_from_table(slip_names):
+    """
+    Fuente B: SUM of amounts from the employer_contributions child table
+    (parentfield = 'employer_contributions') in Salary Detail.
+    """
+    if not slip_names:
+        return {}
+
+    sd = frappe.qb.DocType("Salary Detail")
+
     rows = (
         frappe.qb.from_(sd)
         .select(sd.parent, sd.amount)
         .where(sd.parent.isin(slip_names))
-        .where(sd.salary_component == component_name)
-        .where(sd.parentfield.isin(["earnings", "deductions"]))
+        .where(sd.parentfield == "employer_contributions")
     ).run(as_dict=1)
-    return {r.parent: flt(r.amount) for r in rows}
+
+    result = {}
+    for r in rows:
+        result[r.parent] = result.get(r.parent, 0) + flt(r.amount)
+    return result
 
 
-def get_salary_slips(filters, group_by_field, include_employment_type=False):
+def get_salary_slips(filters, group_by_field):
     ss = frappe.qb.DocType("Salary Slip")
     emp = frappe.qb.DocType("Employee")
-
-    select_cols = [
-        ss.name,
-        ss.net_pay,
-        ss.exchange_rate,
-        ss[group_by_field],
-    ]
-    if include_employment_type:
-        select_cols.append(emp.employment_type)
 
     query = (
         frappe.qb.from_(ss)
         .left_join(emp).on(ss.employee == emp.name)
-        .select(*select_cols)
+        .select(
+            ss.name,
+            ss.employee,
+            ss.net_pay,
+            ss.exchange_rate,
+            ss.custom_payroll_type,
+            emp[group_by_field],
+        )
     )
 
     if filters.get("docstatus"):
@@ -203,7 +207,7 @@ def get_salary_slips(filters, group_by_field, include_employment_type=False):
         query = query.where(ss.end_date <= filters.get("to_date"))
     if filters.get("company"):
         query = query.where(ss.company == filters.get("company"))
-    if filters.get("employment_type"):
-        query = query.where(emp.employment_type == filters.get("employment_type"))
+    if filters.get("payroll_type"):
+        query = query.where(ss.custom_payroll_type == filters.get("payroll_type"))
 
     return query.run(as_dict=1)

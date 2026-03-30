@@ -1132,3 +1132,98 @@ Assign attendance records at calculating salary slips,Asignar los registros de a
 Unmarked attendance status,Estado de asistencia no marcada
 Missing Configuration,Configuración Faltante
 "Please configure 'Assign attendance records at calculating salary slips' and 'Unmarked attendance status' in Payroll Settings because 'Validate Attendance' is disabled.","Por favor configure 'Asignar los registros de asistencia al calcular recibos de sueldo' y 'Estado de asistencia no marcada' en la Configuración de Nómina porque 'Validar Asistencia' está desactivado."
+Assign,Asignar
+"Assign Salary Structure","Asignar Estructura Salarial"
+"Assign Salary Structure — {0}","Asignar Estructura Salarial — {0}"
+Base Salary,Salario Base
+Both,Ambos
+Cancelled,Cancelado
+"Click «Preview» to see what will be generated.","Haz clic en «Vista previa» para ver qué se generará."
+Company,Empresa
+"Company, Payroll Type, Dates, and Payment Account are mandatory.","Empresa, Tipo de Nómina, Fechas y Cuenta de Pago son obligatorios."
+Cuenta de Pago,Cuenta de Pago
+Department,Departamento
+Draft,Borrador
+Empleado,Empleado
+Empleados,Empleados
+Employee,Empleado
+End Date,Fecha de Fin
+Frequency,Frecuencia
+From Date,Desde Fecha
+Generate,Generar
+Generate Payroll,Generar Nómina
+Grand Total Budget,Presupuesto Total
+Gross Total,Total Bruto
+History,Historial
+Honorarium Total,Total Planilla Honorario
+Honorariums,Planilla Honorarios
+"Income Tax Slab (ISR)","Tabla ISR"
+"Employee (A-Z)","Empleado (A-Z)"
+"Employee (Z-A)","Empleado (Z-A)"
+Load more,Cargar más
+Loading records…,Cargando registros…
+Loading…,Cargando…
+"No eligible employees found for the selected options.","No se encontraron empleados elegibles para las opciones seleccionadas."
+No matching employees found,No se encontraron empleados
+"No salary assignments found for this employee.","No se encontraron asignaciones salariales para este empleado."
+Not set,No asignado
+Open,Abrir
+Open Employee,Abrir Empleado
+Payroll Dashboard,Tablero de Nómina
+Payroll Options,Opciones de Nómina
+Payroll Type,Tipo de Nómina
+"Payroll Type must be 'Regular Salary', 'Honorariums', or 'Both'.","El Tipo de Nómina debe ser 'Nomina de Sueldo', 'Planilla Honorarios' o 'Ambas'."
+"Payroll generation queued. Run ID: {0}","Generación de nómina en cola. Run ID: {0}"
+"Payroll generation started — Run ID: {0}","Generación iniciada — Run ID: {0}"
+"Please fill Start Date, End Date, and Payroll Type first.","Por favor completa Fecha de Inicio, Fecha de Fin y Tipo de Nómina primero."
+"Please run Preview first to verify the batches before generating.","Por favor ejecuta Vista previa primero para verificar los lotes antes de generar."
+"Please select a company first.","Por favor selecciona una empresa primero."
+Preview,Vista previa
+"Pulled from the selected Salary Structure","Tomado de la Estructura Salarial seleccionada"
+Queuing payroll generation…,Poniendo en cola la generación de nómina…
+Regular Salary,Nomina de Sueldo
+Regular Total,Total Nomina de Sueldo
+Resync,Resincronizar
+"Salary (High → Low)","Salario (Mayor → Menor)"
+"Salary (Low → High)","Salario (Menor → Mayor)"
+Salary History,Historial Salarial
+"Salary History — {0}","Historial Salarial — {0}"
+Salary Structure,Estructura Salarial
+"Salary assigned to {0}","Salario asignado a {0}"
+Save & Submit,Guardar y Enviar
+Saving…,Guardando…
+Sin Departamento,Sin Departamento
+Sin Sucursal,Sin Sucursal
+Sort By,Ordenar por
+Start Date,Fecha de Inicio
+Status,Estado
+Submitted,Enviado
+Tipo,Tipo
+Total,Total
+Total Employees,Total Empleados
+Type,Tipo
+Unassigned,Sin Asignar
+Variable,Variable
+unassigned,sin asignar
+"{0} of {1}","{0} de {1}"
+Period,Período
+"Editable. Used in the Payroll Entry description.","Editable. Se usa en la descripción de la Entrada de Nomina."
+Grouping,Agrupación
+Group by Department,Agrupar por Departamento
+Group by Branch,Agrupar por Sucursal
+Gross Pay,Salario Bruto
+Deductions,Deducciones
+Net Pay,Salario Neto
+"{0} employee(s) could not be calculated:","{0} empleado(s) no se pudieron calcular:"
+"error(s)","error(s)"
+Payroll Type: {0},Tipo de Nómina: {0}
+Employee Name Format,Formato de Nombre del Empleado,
+Controls how employee names are displayed in the Payroll Dashboard.,Controla cómo se mostrarán los nombres de los empleados en el Tablero de Nómina.
+Display Settings,Configuración de Pantalla,
+"If checked, this component will be tracked separately as an employer contribution and will not affect the employee's net pay.","Si se marca, este componente se rastreará por separado como contribución del empleador y no afectará el salario neto del empleado."
+Is a Component of Contribution,Es un Componente de Contribución
+Employer Contributions,Contribuciones del Empleador
+Letter Case,Formato de Letra
+Uppercase,Mayúscula
+Lowercase,Minúscula
+Title Case,Mayúscula en cada palabra

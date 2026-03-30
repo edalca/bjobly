@@ -1,6 +1,7 @@
 import frappe
 import json
 from frappe import _
+from bjobly.bjobly.utils import validate_payroll_range
 from frappe.utils import flt, getdate, formatdate, add_days, add_months
 from hrms.payroll.doctype.payroll_entry.payroll_entry import (
     PayrollEntry,
@@ -14,74 +15,25 @@ from hrms.payroll.doctype.payroll_entry.payroll_entry import (
     set_match_conditions,
     show_payroll_submission_status
 )
-
+from frappe.utils import (
+    DATE_FORMAT,
+    add_days,
+    add_to_date,
+    cint,
+    comma_and,
+    date_diff,
+    flt,
+    get_link_to_form,
+    getdate,
+)
 import unicodedata
 
 class BjoblyPayrollEntry(PayrollEntry):
     def validate(self):
-        self.validate_payroll_range()
+        validate_payroll_range(self.start_date, self.end_date, self.payroll_frequency)
+
         super(BjoblyPayrollEntry, self).validate()
-
-        # Pre-check attendance configuration if validation is OFF
-        if not self.validate_attendance:
-            ps = frappe.get_cached_value("Payroll Settings", None, 
-                ["assign_attendance_at_calculating_salary_slips", "unmarked_attendance_status"], 
-                as_dict=1)
-            if not ps or not ps.assign_attendance_at_calculating_salary_slips or not ps.unmarked_attendance_status:
-                frappe.throw(
-                    _("Please configure 'Assign attendance records at calculating salary slips' and 'Unmarked attendance status' in Payroll Settings "
-                      "because 'Validate Attendance' is disabled."),
-                    title=_("Missing Configuration")
-                )
-
-    def save(self, *args, **kwargs):
-        """Override save para reaplique el formato de nombre tras cada guardado."""
-        super().save(*args, **kwargs)
-        self._reapply_employee_name_format()
-
-    def _reapply_employee_name_format(self):
-        """Reaplica el formato de employee_name en el child table después de un save."""
-        sort_by = getattr(self, "sort_employees_by", None)
-        LASTNAME_FIRST = {
-            "Last Name, First Name Middle Name",
-            "Last Name, First Name",
-            "Last Name First Name Middle Name",
-        }
-        FIRSTNAME_FIRST = {
-            "First Name Middle Name Last Name",
-            "First Name Last Name",
-            "First Name Middle Initial. Last Name",
-        }
-        if not self.employees or sort_by not in (LASTNAME_FIRST | FIRSTNAME_FIRST):
-            return
-
-        emp_ids = [row.employee for row in self.employees]
-        emp_data = frappe.get_all(
-            "Employee",
-            filters={"name": ["in", emp_ids]},
-            fields=["name", "first_name", "middle_name", "last_name"],
-        )
-        name_map = {e.name: e for e in emp_data}
-
-        for emp_row in self.employees:
-            info = name_map.get(emp_row.employee)
-            if not info:
-                continue
-            formatted = _format_employee_name(
-                info.get("first_name") or "",
-                info.get("middle_name") or "",
-                info.get("last_name") or "",
-                sort_by,
-            )
-            if emp_row.employee_name != formatted:
-                frappe.db.set_value(
-                    "Payroll Employee Detail",
-                    emp_row.name,
-                    "employee_name",
-                    formatted,
-                    update_modified=False,
-                )
-                emp_row.employee_name = formatted
+        self._check_attendance_settings()
 
 
     def on_submit(self):
@@ -97,6 +49,7 @@ class BjoblyPayrollEntry(PayrollEntry):
         args = frappe._dict({
             "salary_slip_based_on_timesheet": self.salary_slip_based_on_timesheet,
             "payroll_frequency": self.payroll_frequency,
+            "custom_payroll_type": self.custom_payroll_type,
             "start_date": self.start_date,
             "end_date": self.end_date,
             "company": self.company,
@@ -143,48 +96,38 @@ class BjoblyPayrollEntry(PayrollEntry):
         self.db_set("error_message", "")
         frappe.publish_realtime("bjobly_payroll_cancelled", {"name": self.name}, user=frappe.session.user)
 
-    def validate_payroll_range(self):
-        """
-        Validates that the selected date range matches the logical payroll frequency.
-        Example: Monthly from Feb 2 must end on March 1.
-        """
-        if not self.start_date or not self.end_date or not self.payroll_frequency:
+    def validate_existing_salary_slips(self):
+        if not self.employees:
             return
 
-        start = getdate(self.start_date)
-        end = getdate(self.end_date)
-        
-        # Lógica de bloques lógicos de tiempo
-        if self.payroll_frequency == "Monthly":
-            # Un mes lógico: (Mes + 1) - 1 día. 
-            # Ej: Feb 2 + 1 mes = Mar 2 -> Mar 2 - 1 día = Mar 1.
-            expected_end = add_days(add_months(start, 1), -1)
-            
-        elif self.payroll_frequency == "Fortnightly":
-            # Quincena lógica: 15 días calendario
-            expected_end = add_days(start, 14)
-            
-        elif self.payroll_frequency == "Weekly":
-            # Semana lógica: 7 días calendario
-            expected_end = add_days(start, 6)
-            
-        elif self.payroll_frequency == "Bimonthly":
-            # Bimestre lógico: (Mes + 2) - 1 día
-            expected_end = add_days(add_months(start, 2), -1)
-            
-        elif self.payroll_frequency == "Daily":
-            expected_end = start
-        else:
-            return
+        existing_salary_slips = []
+        SalarySlip = frappe.qb.DocType("Salary Slip")
 
-        # Si la fecha seleccionada no es la esperada, lanzamos error
-        if end != expected_end:
-            frappe.throw(
-                _("The date range is incorrect for <b>{0}</b> frequency.<br><br>"
-                  "Based on Start Date <b>{1}</b>, the End Date must be <b>{2}</b>.")
-                .format(self.payroll_frequency, formatdate(start), formatdate(expected_end)),
-                title=_("Invalid Date Range")
+        existing_salary_slips = (
+            frappe.qb.from_(SalarySlip)
+            .select(SalarySlip.employee, SalarySlip.name)
+            .where(
+                (SalarySlip.employee.isin([emp.employee for emp in self.employees]))
+                & (SalarySlip.start_date == self.start_date)
+                & (SalarySlip.custom_payroll_type == self.custom_payroll_type)
+                & (SalarySlip.end_date == self.end_date)
+                & (SalarySlip.docstatus != 2)
             )
+        ).run(as_dict=True)
+
+        if len(existing_salary_slips):
+            msg = _("Salary Slip already exists for {0} for the given dates").format(
+                comma_and([frappe.bold(d.employee) for d in existing_salary_slips])
+            )
+            msg += "<br><br>"
+            msg += _("Reference: {0}").format(
+                comma_and([get_link_to_form("Salary Slip", d.name) for d in existing_salary_slips])
+            )
+            frappe.throw(
+                msg,
+                title=_("Duplicate Entry"),
+            )
+
     @frappe.whitelist()
     def create_journal_entry(self):
         """Create the accrual journal entry for submitted salary slips."""
@@ -251,22 +194,12 @@ class BjoblyPayrollEntry(PayrollEntry):
         employees = [emp.employee for emp in self.employees]
 
         if employees:
-            # Pre-check attendance configuration if validation is OFF
-            if not self.validate_attendance:
-                ps = frappe.get_cached_value("Payroll Settings", None, 
-                    ["assign_attendance_at_calculating_salary_slips", "unmarked_attendance_status"], 
-                    as_dict=1)
-                if not ps or not ps.assign_attendance_at_calculating_salary_slips or not ps.unmarked_attendance_status:
-                    frappe.throw(
-                        _("Please configure 'Assign attendance records at calculating salary slips' and 'Unmarked attendance status' in Payroll Settings "
-                          "because 'Validate Attendance' is disabled."),
-                        title=_("Missing Configuration")
-                    )
-
+            self._check_attendance_settings()
             args = frappe._dict(
                 {
                     "salary_slip_based_on_timesheet": self.salary_slip_based_on_timesheet,
                     "payroll_frequency": self.payroll_frequency,
+                    "custom_payroll_type": self.custom_payroll_type,
                     "start_date": self.start_date,
                     "end_date": self.end_date,
                     "company": self.company,
@@ -321,86 +254,55 @@ class BjoblyPayrollEntry(PayrollEntry):
                 error_msg += "<br>" + _("Start date: {0}").format(frappe.bold(self.start_date))
             if self.end_date:
                 error_msg += "<br>" + _("End date: {0}").format(frappe.bold(self.end_date))
+            if self.custom_payroll_type:
+                error_msg += "<br>" + _("Payroll Type: {0}").format(frappe.bold(_(self.custom_payroll_type)))
+
 
             frappe.throw(error_msg, title=_("No employees found"))
-
-        # Ordenar empleados según el campo sort_employees_by (Predeterminado: Last Name, First Name Middle Name)
-        sort_by = getattr(self, "sort_employees_by", None) or "Last Name, First Name Middle Name"
-        LASTNAME_FIRST = {
-            "Last Name, First Name Middle Name",
-            "Last Name, First Name",
-            "Last Name First Name Middle Name",
-        }
-        FIRSTNAME_FIRST = {
-            "First Name Middle Name Last Name",
-            "First Name Last Name",
-            "First Name Middle Initial. Last Name",
-        }
-
-        # Construir name_map si se necesita ordenar/formatear
-        name_map = {}
-        if sort_by in (LASTNAME_FIRST | FIRSTNAME_FIRST):
-            emp_ids = [e.employee for e in employees]
-            emp_names = frappe.get_all(
-                "Employee",
-                filters={"name": ["in", emp_ids]},
-                fields=["name", "first_name", "middle_name", "last_name"],
-            )
-            
-            if emp_names:
-                name_map = {e.name: e for e in emp_names}
-            
-            # ALWAYS sort by Last Name, First Name, Middle Name for consistent Payroll lists
-            # even if the display format is different.
-            employees = sorted(
-                employees,
-                key=lambda e: (
-                    _normalize_for_sort(name_map.get(e.employee, {}).get("last_name") or ""),
-                    _normalize_for_sort(name_map.get(e.employee, {}).get("first_name") or ""),
-                    _normalize_for_sort(name_map.get(e.employee, {}).get("middle_name") or ""),
-                )
-            )
 
         self.set("employees", employees)
         self.number_of_employees = len(self.employees)
         self.update_employees_with_withheld_salaries()
         self.salary_slips_calculated = 0
-        self.save(ignore_permissions=True)  # _reapply_employee_name_format() se llama automáticamente
+        self.save(ignore_permissions=True)
 
         return self.get_employees_with_unmarked_attendance()
 
-
-def _format_employee_name(first_name, middle_name, last_name, format_type):
-    """Formats employee name based on the selected format_type."""
-    f = first_name.strip()
-    m = middle_name.strip()
-    l = last_name.strip()
+    def _check_attendance_settings(self):
+        """
+        Helper method to check attendance configuration in Payroll Settings
+        if validate_attendance is disabled for the current Payroll Entry.
+        """
+        if not self.validate_attendance:
+            ps = frappe.get_cached_value("Payroll Settings", None, 
+                ["assign_attendance_at_calculating_salary_slips", "unmarked_attendance_status"], 
+                as_dict=1)
+            if not ps or not ps.assign_attendance_at_calculating_salary_slips or not ps.unmarked_attendance_status:
+                frappe.throw(
+                    _("Please configure 'Assign attendance records at calculating salary slips' and 'Unmarked attendance status' in Payroll Settings "
+                      "because 'Validate Attendance' is disabled."),
+                    title=_("Missing Configuration")
+                )
     
-    m_initial = f"{m[0]}." if m else ""
+    def make_filters(self):
+        filters = frappe._dict(
+            company=self.company,
+            branch=self.branch,
+            department=self.department,
+            designation=self.designation,
+            grade=self.grade,
+            currency=self.currency,
+            start_date=self.start_date,
+            end_date=self.end_date,
+            payroll_payable_account=self.payroll_payable_account,
+            salary_slip_based_on_timesheet=self.salary_slip_based_on_timesheet,
+            custom_payroll_type=self.custom_payroll_type
+        )
 
-    if format_type == "Last Name, First Name Middle Name":
-        return f"{l}, {f} {m}".strip()
-    elif format_type == "First Name Middle Name Last Name":
-        return f"{f} {m} {l}".strip()
-    elif format_type == "Last Name, First Name":
-        return f"{l}, {f}".strip()
-    elif format_type == "First Name Last Name":
-        return f"{f} {l}".strip()
-    elif format_type == "Last Name First Name Middle Name":
-        return f"{l} {f} {m}".strip()
-    elif format_type == "First Name Middle Initial. Last Name":
-        return f"{f} {m_initial} {l}".strip()
-    
-    return f"{f} {l}".strip()
+        if not self.salary_slip_based_on_timesheet:
+            filters.update(dict(payroll_frequency=self.payroll_frequency))
 
-def _normalize_for_sort(s):
-    """Normalize string for sorting: lowercase and remove accents."""
-    if not s:
-        return ""
-    s = str(s).lower()
-    # Normalize unicode to NFKD and encode to ASCII to strip accents
-    return unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('ASCII')
-
+        return filters
 
 def get_employee_list(
     filters: frappe._dict,
@@ -417,6 +319,7 @@ def get_employee_list(
         filters.currency,
         filters.salary_slip_based_on_timesheet,
         filters.payroll_frequency,
+        filters.custom_payroll_type
     )
 
     if not sal_struct:
@@ -441,6 +344,27 @@ def get_employee_list(
 
     return remove_payrolled_employees(employees_to_check, filters.start_date, filters.end_date)
 
+def get_salary_structure(
+    company: str, currency: str, salary_slip_based_on_timesheet: int, payroll_frequency: str, custom_payroll_type: str
+) -> list[str]:
+    SalaryStructure = frappe.qb.DocType("Salary Structure")
+
+    query = (
+        frappe.qb.from_(SalaryStructure)
+        .select(SalaryStructure.name)
+        .where(
+            (SalaryStructure.docstatus == 1)
+            & (SalaryStructure.is_active == "Yes")
+            & (SalaryStructure.company == company)
+            & (SalaryStructure.currency == currency)
+            & (SalaryStructure.custom_payroll_type == custom_payroll_type)
+            & (SalaryStructure.salary_slip_based_on_timesheet == salary_slip_based_on_timesheet)
+        )
+    )
+    if not salary_slip_based_on_timesheet:
+        query = query.where(SalaryStructure.payroll_frequency == payroll_frequency)
+
+    return query.run(pluck=True)
 
 def get_filtered_employees(
     sal_struct,
@@ -564,10 +488,6 @@ def calculate_salary_slips_for_employees(employees, args, publish_progress=True)
                 
                 # 5. Sync calculated results back to the Child Table row
                 sync_employees_with_salary_slips(emp, salary_slip)
-                
-                # 6. Generate JSON for HTML rendering in the Grid
-                emp.earnings_json = json.dumps([{"salary_component": d.salary_component, "amount": d.amount} for d in salary_slip.earnings])
-                emp.deductions_json = json.dumps([{"salary_component": d.salary_component, "amount": d.amount} for d in salary_slip.deductions])
                 
                 count += 1
                 if publish_progress:

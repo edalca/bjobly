@@ -34,24 +34,10 @@ frappe.query_reports["Payroll Summary"] = {
 			reqd: 1,
 		},
 		{
-			fieldname: "employment_type",
-			label: __("Employment Type"),
-			fieldtype: "Link",
-			options: "Employment Type",
-			depends_on: "eval:!doc.all_employment_types",
-			mandatory_depends_on: "eval:!doc.all_employment_types",
-		},
-		{
-			fieldname: "all_employment_types",
-			label: __("All Employment Types"),
-			fieldtype: "Check",
-			default: 1,
-			on_change: function() {
-				const checked = frappe.query_report.get_filter_value("all_employment_types");
-				if (checked) {
-					frappe.query_report.set_filter_value("employment_type", "");
-				}
-			},
+			fieldname: "payroll_type",
+			label: __("Payroll Type"),
+			fieldtype: "Select",
+			options: "\nRegular Salary\nHonorariums",
 		},
 	],
 };

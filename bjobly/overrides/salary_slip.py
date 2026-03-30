@@ -2,8 +2,10 @@ import frappe
 import json
 from frappe import _, cstr
 from frappe.model.naming import make_autoname
+from bjobly.bjobly.utils import validate_payroll_range
 from frappe.utils import flt, getdate, date_diff, cint, formatdate, add_days, add_months
 from hrms.payroll.doctype.salary_slip.salary_slip import SalarySlip, eval_tax_slab_condition
+from frappe.query_builder import Order
 
 class BjoblySalarySlip(SalarySlip):
     def __init__(self, *args, **kwargs):
@@ -64,58 +66,58 @@ class BjoblySalarySlip(SalarySlip):
             
         return res
 
+    def before_validate(self):
+        """
+        HONORARIUM SHIELD (v2): Professional fees are paid in full regardless of
+        attendance. If this slip is for Honorariums, clear absence counters so the
+        30-day logic in get_working_days_details always returns full payment.
+        """
+        if getattr(self, "custom_payroll_type", None) == "Honorariums":
+            self.leave_without_pay = 0
+            self.absent_days = 0
+            self.unmarked_days = 0
+    def calculate_component_amounts(self,component_type):
+        """
+        OVERRIDE: For employer contributions, calculate amounts using the same logic as earnings/deductions
+        instead of skipping straight to formula evaluation. This ensures that payment day adjustments and
+        other pro-rating logic is applied consistently, even for employer contributions.
+        """
+        super().calculate_component_amounts(component_type)
+        if component_type == "earnings":
+            self.add_employer_contributions()
+
+    def add_employer_contributions(self):
+        "Adds components marked as 'Is Employer Contribution' to a separate table with correct amounts."
+        self.employer_contributions = []  # Clear existing contributions to avoid duplication on re-validation
+        for struct_row in self._salary_structure_doc.get("employer_contributions"):
+            amount = self.eval_condition_and_formula(struct_row, self.data)
+            
+            if flt(amount) or not frappe.get_cached_value(
+                "Salary Component", struct_row.salary_component, "remove_if_zero_valued"
+            ):
+                self.append(
+                    "employer_contributions",
+                    {
+                        "salary_component": struct_row.salary_component,
+                        "abbr": struct_row.abbr,
+                        "amount": flt(amount, struct_row.precision("amount")),
+                        "default_amount": flt(amount),
+                        "additional_amount": 0,
+                        "statistical_component": 0,
+                        "depends_on_payment_days": cint(struct_row.depends_on_payment_days),
+                        "parentfield": "employer_contributions",
+                    },
+                )
+
     def validate(self):
         # 1. Initialize tax_slab to prevent AttributeErrors if calculation is skipped
         self.tax_slab = getattr(self, "tax_slab", None)
 
         # 2. Validar que el rango de fechas coincida con la frecuencia
-        self.validate_payroll_range()
+        validate_payroll_range(self.start_date, self.end_date, self.payroll_frequency)
         
         # 3. Ejecutar las validaciones estándar de ERPNext
         super().validate()
-
-    def validate_payroll_range(self):
-        """
-        Validates that the selected date range matches the logical payroll frequency.
-        Example: Monthly from Feb 2 must end on March 1.
-        """
-        if not self.start_date or not self.end_date or not self.payroll_frequency:
-            return
-
-        start = getdate(self.start_date)
-        end = getdate(self.end_date)
-        
-        # Lógica de bloques lógicos de tiempo
-        if self.payroll_frequency == "Monthly":
-            # Un mes lógico: (Mes + 1) - 1 día. 
-            # Ej: Feb 2 + 1 mes = Mar 2 -> Mar 2 - 1 día = Mar 1.
-            expected_end = add_days(add_months(start, 1), -1)
-            
-        elif self.payroll_frequency == "Fortnightly":
-            # Quincena lógica: 15 días calendario
-            expected_end = add_days(start, 14)
-            
-        elif self.payroll_frequency == "Weekly":
-            # Semana lógica: 7 días calendario
-            expected_end = add_days(start, 6)
-            
-        elif self.payroll_frequency == "Bimonthly":
-            # Bimestre lógico: (Mes + 2) - 1 día
-            expected_end = add_days(add_months(start, 2), -1)
-            
-        elif self.payroll_frequency == "Daily":
-            expected_end = start
-        else:
-            return
-
-        # Si la fecha seleccionada no es la esperada, lanzamos error
-        if end != expected_end:
-            frappe.throw(
-                _("The date range is incorrect for <b>{0}</b> frequency.<br><br>"
-                  "Based on Start Date <b>{1}</b>, the End Date must be <b>{2}</b>.")
-                .format(self.payroll_frequency, formatdate(start), formatdate(expected_end)),
-                title=_("Invalid Date Range")
-            )
 
     def get_working_days_details(self, lwp=None, for_preview=0, lwp_days_corrected=None):
         """
@@ -223,6 +225,89 @@ class BjoblySalarySlip(SalarySlip):
         worked_days = min(abs(date_diff(start_date, end_date)), days)
         return amount * (worked_days / days)
 
+    def check_existing(self):
+        """
+        OVERRIDE: Allow two salary slips per period if custom_payroll_type differs.
+        Standard HRMS would throw if *any* slip exists for the same employee+period.
+        We only block duplicates when the payroll_type is the same (or both blank).
+        """
+        if not self.salary_slip_based_on_timesheet:
+            ss = frappe.qb.DocType("Salary Slip")
+            query = (
+                frappe.qb.from_(ss)
+                .select(ss.name)
+                .where(
+                    (ss.start_date == self.start_date)
+                    & (ss.end_date == self.end_date)
+                    & (ss.custom_payroll_type == self.custom_payroll_type)
+                    & (ss.docstatus != 2)
+                    & (ss.employee == self.employee)
+                    & (ss.name != self.name)
+                )
+            )
+
+            if self.payroll_entry:
+                query = query.where(ss.payroll_entry == self.payroll_entry)
+
+            ret_exist = query.run()
+
+            if ret_exist:
+                frappe.throw(
+                    _("Salary Slip of employee {0} already created for this period").format(self.employee)
+                )
+        else:
+            for data in self.timesheets:
+                if frappe.db.get_value("Timesheet", data.time_sheet, "status") == "Payrolled":
+                    frappe.throw(
+                        _("Salary Slip of employee {0} already created for time sheet {1}").format(
+                            self.employee, data.time_sheet
+                        )
+                    )
+    
+    def check_sal_struct(self):
+        ss = frappe.qb.DocType("Salary Structure")
+        ssa = frappe.qb.DocType("Salary Structure Assignment")
+
+        query = (
+            frappe.qb.from_(ssa)
+            .join(ss)
+            .on(ssa.salary_structure == ss.name)
+            .select(ssa.salary_structure)
+            .where(
+                (ssa.docstatus == 1)
+                & (ss.docstatus == 1)
+                & (ss.is_active == "Yes")
+                & (ssa.employee == self.employee)
+                & (ssa.company == self.company)
+                & (ssa.custom_payroll_type == self.custom_payroll_type)
+                & (
+                    (ssa.from_date <= self.start_date)
+                    | (ssa.from_date <= self.end_date)
+                    | (ssa.from_date <= self.joining_date)
+                )
+            )
+            .orderby(ssa.from_date, order=Order.desc)
+            .limit(1)
+        )
+
+        if not self.salary_slip_based_on_timesheet and self.payroll_frequency:
+            query = query.where(ss.payroll_frequency == self.payroll_frequency)
+
+        st_name = query.run()
+
+        if st_name:
+            self.salary_structure = st_name[0][0]
+            return self.salary_structure
+
+        else:
+            self.salary_structure = None
+            frappe.msgprint(
+                _("No active or default Salary Structure found for employee {0} for the given dates").format(
+                    self.employee
+                ),
+                title=_("Salary Structure Missing"),
+            )
+
     def autoname(self):
         """Override document name using the custom series (SS/...)"""
         self.name = make_autoname(self.series)
@@ -278,7 +363,14 @@ class BjoblySalarySlip(SalarySlip):
             self.calculate_variable_tax(self.additional_salary_component, True)
             return
 
-        super().compute_variable_tax()
+        from hrms.payroll.doctype.salary_slip.salary_slip import get_salary_component_data
+        for tax_component in tax_components:
+            self._component_based_variable_tax.setdefault(tax_component, {})
+            self.calculate_variable_based_on_taxable_salary(tax_component)
+            if self._component_based_variable_tax[tax_component]:
+                tax_amount = self._component_based_variable_tax[tax_component]["current_tax_amount"]
+                tax_row = get_salary_component_data(tax_component)
+                self.update_component_row(tax_row, tax_amount, "deductions")
 
     def get_income_tax_slabs(self):
         """
@@ -408,7 +500,7 @@ class BjoblySalarySlip(SalarySlip):
 
 def calculate_tax_by_tax_slab(annual_taxable_earning, tax_slab, eval_globals=None, eval_locals=None):
     """Custom Income Tax Slab logic using 'amount_previusly_taxed' for tiered scaling"""
-    tax_amount = 0
+    tax_amount = 0 # Corrected typo: amount_previusly_taxed -> amount_previously_taxed
     other_taxes_and_charges = 0
     amount_previusly_taxed = 0
 

@@ -1,0 +1,141 @@
+{
+ "actions": [],
+ "autoname": "prompt",
+ "creation": "2026-03-27 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "image",
+  "employee_name",
+  "employee",
+  "payroll_type",
+  "company",
+  "column_break_1",
+  "current_base_salary",
+  "variable_salary",
+  "total_salary",
+  "section_break_2",
+  "department",
+  "designation",
+  "branch"
+ ],
+ "fields": [
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image"
+  },
+  {
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Employee Name"
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "label": "Employee",
+   "options": "Employee",
+   "reqd": 1
+  },
+  {
+   "fieldname": "payroll_type",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Payroll Type"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "current_base_salary",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Base Salary"
+  },
+  {
+   "fieldname": "variable_salary",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Variable Salary"
+  },
+  {
+   "fieldname": "total_salary",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Total Salary"
+  },
+  {
+   "fieldname": "section_break_2",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "designation",
+   "fieldtype": "Link",
+   "label": "Designation",
+   "options": "Designation"
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch"
+  }
+ ],
+ "in_create": 1,
+ "is_virtual": 1,
+ "links": [],
+ "modified": "2026-03-28 22:26:30.312089",
+ "modified_by": "Administrator",
+ "module": "Bjobly",
+ "name": "Bjobly Employee Cache",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "read_only": 1,
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "employee_name"
+}

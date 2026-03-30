@@ -26,8 +26,7 @@ required_apps = ["hrms"]
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/bjobly/css/bjobly.css"
-# app_include_js = "/assets/bjobly/js/bjobly.js"
-
+app_include_js = "/assets/bjobly/js/utils.js"
 # include js, css files in header of web template
 # web_include_css = "/assets/bjobly/css/bjobly.css"
 # web_include_js = "/assets/bjobly/js/bjobly.js"
@@ -44,13 +43,17 @@ required_apps = ["hrms"]
 
 # include js in doctype views
 doctype_js = {
-    "Payroll Entry": "public/js/payroll_entry.js"
+    "Payroll Entry":  "public/js/overrides/payroll_entry.js",
+    "Salary Slip":    "public/js/overrides/salary_slip.js",
+    "Salary Structure": "public/js/overrides/salary_structure.js",
 }
 doctype_list_js = {
-    "Payroll Entry" : "public/js/payroll_entry_list.js"
+    "Payroll Entry" : "public/js/overrides/payroll_entry_list.js"
 }
-# doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
-# doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
+
+# Document Events
+doc_events = {
+}
 
 # Svg Icons
 # ------------------
@@ -70,7 +73,7 @@ doctype_list_js = {
 
 # Generators
 # ----------
-
+extend_bootinfo = "bjobly.startup.boot.boot_info"
 # automatically create page for each record of this doctype
 # website_generators = ["Web Page"]
 
