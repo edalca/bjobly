@@ -51,7 +51,7 @@ def preview_payroll(
 
     preview = []
     for pt in payroll_types:
-        groups = _build_groups(company, pt, departments, group_by_department, group_by_branch)
+        groups = _build_groups(company, pt, departments, group_by_department, group_by_branch, start_date=start_date)
         for group_key, group_data in groups.items():
             employees = group_data["employees"]
             if not employees:
@@ -181,7 +181,7 @@ def _run_generation(
         payroll_types = ["Regular Salary", "Honorariums"] if payroll_type == "Both" else [payroll_type]
 
         for pt in payroll_types:
-            groups = _build_groups(company, pt, departments, group_by_department, group_by_branch)
+            groups = _build_groups(company, pt, departments, group_by_department, group_by_branch, start_date=start_date)
 
             for group_key, group_data in groups.items():
                 employees = group_data["employees"]
@@ -293,19 +293,26 @@ def _calculate_totals_in_memory(employees, company, start_date, end_date, payrol
     }
 
 
-def _build_groups(company, payroll_type, departments, group_by_department, group_by_branch):
+def _build_groups(company, payroll_type, departments, group_by_department, group_by_branch, start_date=None):
     """
     Returns { group_key: {"employees": [...], "department": str|None, "branch": str|None} }
     for a single payroll_type. group_key encodes dept and/or branch depending on options.
+    Excludes employees whose relieving_date is before start_date.
     """
-    filters = {"company": company, "status": "Active"}
-    if departments:
-        filters["department"] = ["in", departments]
+    conds = ["e.company = %(company)s", "e.status = 'Active'"]
+    sql_args = {"company": company}
 
-    employees = frappe.get_all(
-        "Employee",
-        filters=filters,
-        fields=["name", "department", "branch"],
+    if start_date:
+        conds.append("(e.relieving_date IS NULL OR e.relieving_date >= %(start_date)s)")
+        sql_args["start_date"] = start_date
+
+    if departments:
+        conds.append("e.department IN %(departments)s")
+        sql_args["departments"] = tuple(departments)
+
+    employees = frappe.db.sql(
+        "SELECT e.name, e.department, e.branch FROM `tabEmployee` e WHERE " + " AND ".join(conds),
+        sql_args, as_dict=True,
     )
 
     eligible = [e for e in employees if _employee_has_payroll_type(e.name, payroll_type)]
