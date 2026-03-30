@@ -344,6 +344,23 @@ def get_employee_list(
 
     return remove_payrolled_employees(employees_to_check, filters.start_date, filters.end_date,filters.custom_payroll_type)
 
+def remove_payrolled_employees(emp_list, start_date, end_date,custom_payroll_type=None):
+	SalarySlip = frappe.qb.DocType("Salary Slip")
+
+	employees_with_payroll = (
+		frappe.qb.from_(SalarySlip)
+		.select(SalarySlip.employee)
+		.where(
+			(SalarySlip.docstatus == 1)
+
+			& (SalarySlip.start_date == start_date)
+			& (SalarySlip.end_date == end_date)
+			& (SalarySlip.custom_payroll_type == custom_payroll_type)
+		)
+	).run(pluck=True)
+
+	return [emp_list[emp] for emp in emp_list if emp not in employees_with_payroll]
+
 def get_salary_structure(
     company: str, currency: str, salary_slip_based_on_timesheet: int, payroll_frequency: str, custom_payroll_type: str
 ) -> list[str]:
