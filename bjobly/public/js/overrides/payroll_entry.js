@@ -16,7 +16,6 @@ frappe.ui.form.on("Payroll Entry", {
 
 		frappe.db.get_single_value("Payroll Settings", "sort_employees_by").then(function (fmt) {
 			frm._bjobly_name_fmt = fmt;
-			bjobly.apply_name_format_to_grid(frm, "employees", fmt);
 		});
 	},
 
@@ -52,8 +51,13 @@ frappe.ui.form.on("Payroll Entry", {
 	},
 
 	refresh: function (frm) {
+		// Hide operation buttons when document is not in Draft
+		var is_draft = frm.doc.docstatus === 0;
+		frm.toggle_display("get_employees_btn",     is_draft);
+		frm.toggle_display("calculate_salaries_btn", is_draft);
+
 		// Clean refresh: remove most automated buttons to favor the Dashboard
-		if (frm.doc.docstatus === 0 && !frm.is_new()) {
+		if (is_draft && !frm.is_new()) {
 			frm.clear_custom_buttons();
 		}
 

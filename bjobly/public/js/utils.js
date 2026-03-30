@@ -49,7 +49,8 @@ bjobly.apply_name_format_to_grid = function (frm, table_field, name_fmt) {
 		if (!row.employee_name) return;
 		var formatted = bjobly.format_emp_name(row.employee_name, name_fmt);
 		if (formatted !== row.employee_name) {
-			frappe.model.set_value(row.doctype, row.name, "employee_name", formatted);
+			// Write directly to avoid marking the document as dirty
+			row.employee_name = formatted;
 		}
 	});
 	grid.refresh();
