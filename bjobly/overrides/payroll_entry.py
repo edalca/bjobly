@@ -342,7 +342,7 @@ def get_employee_list(
     else:
         employees_to_check = {emp[0]: emp for emp in emp_list}
 
-    return remove_payrolled_employees(employees_to_check, filters.start_date, filters.end_date)
+    return remove_payrolled_employees(employees_to_check, filters.start_date, filters.end_date,filters.custom_payroll_type)
 
 def get_salary_structure(
     company: str, currency: str, salary_slip_based_on_timesheet: int, payroll_frequency: str, custom_payroll_type: str

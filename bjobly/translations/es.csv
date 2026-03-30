@@ -1221,8 +1221,8 @@ Employee Name Format,Formato de Nombre del Empleado,
 Controls how employee names are displayed in the Payroll Dashboard.,Controla cómo se mostrarán los nombres de los empleados en el Tablero de Nómina.
 Display Settings,Configuración de Pantalla,
 "If checked, this component will be tracked separately as an employer contribution and will not affect the employee's net pay.","Si se marca, este componente se rastreará por separado como contribución del empleador y no afectará el salario neto del empleado."
-Is a Component of Contribution,Es un Componente de Contribución
-Employer Contributions,Contribuciones del Empleador
+Is a Component of Contribution,Es un Componente de Cuota Patronal
+Employer Contributions,Cuota Patronal
 Letter Case,Formato de Letra
 Uppercase,Mayúscula
 Lowercase,Minúscula

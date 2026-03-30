@@ -289,12 +289,12 @@ def get_custom_fields():
             },
         ],
         "Salary Structure": [
-            {"fieldname": "custom_payroll_type", "label": _("Payroll Type"), "fieldtype": "Select", "options": "\nRegular Salary\nHonorariums", "insert_after": "is_active", "in_list_view": 1},
+            {"fieldname": "custom_payroll_type", "label": _("Payroll Type"), "fieldtype": "Select", "options": "\nRegular Salary\nHonorariums", "insert_after": "is_active", "in_list_view": 1,"reqd": 1},
             {"fieldname": "employer_contributions", "label": _("Employer Contributions"), "fieldtype": "Table", "options": "Salary Detail", "insert_after": "deductions","allow_on_submit": 1},
         ],
         "Salary Slip": [
             # --- v2: Mixed Payroll type tag ---
-            {"fieldname": "custom_payroll_type", "label": _("Payroll Type"), "fieldtype": "Select", "options": "\nRegular Salary\nHonorariums", "insert_after": "salary_structure", "in_list_view": 1},
+            {"fieldname": "custom_payroll_type", "label": _("Payroll Type"), "fieldtype": "Select", "options": "\nRegular Salary\nHonorariums", "insert_after": "salary_structure", "in_list_view": 1,"reqd": 1},
             # --- SECCIÓN ESTADÍSTICA (Nueva) ---
             {"fieldname": "unmarked_days", "label": _("Unmarked Days"), "fieldtype": "Float", "read_only": 1, "insert_after": "base_hour_rate"},
             # --- SECCIÓN ACUMULADOS (YTD) ---
